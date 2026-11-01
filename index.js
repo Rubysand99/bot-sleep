@@ -1633,7 +1633,7 @@ client.once(Events.ClientReady || 'ready', async () => {
         console.error('❌ Lỗi khi nạp Slash Commands:', err);
     }
 
-    log.info('READY', `Chế độ bot: ${profile.current().id}`, { autobuy: profile.has('autobuy'), sold: profile.has('sold'), bxh: profile.has('bxh'), legit: profile.has('legit'), dem_legit: profile.forcedLegitCount() ?? 'theo /config legit_dem', chi_server: profile.allowedGuilds().join(',') || '(tất cả)' });
+    log.info('READY', `Chế độ bot: ${profile.current().id}`, { autobuy: profile.has('autobuy'), sold: profile.has('sold'), bxh: profile.has('bxh'), legit: profile.has('legit'), dem_legit_mac_dinh: profile.defaultLegitCount(), chi_server: profile.allowedGuilds().join(',') || '(tất cả)' });
     if (profile.has('autobuy')) await reconcileOnStartup();
     for (const g of client.guilds.cache.values()) await logGuildDiagnostics(g);
     if (profile.has('legit')) await scanLegitChannels().catch(err => console.error('[LỖI QUÉT LEGIT]:', err));

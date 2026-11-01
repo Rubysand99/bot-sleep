@@ -86,11 +86,11 @@ const setExtraStaff = (guild, ids) => {
 const clearExtraLists = () => { extraStaff.clear(); extraOwners.clear(); };
 
 const profile = require('./profile');
-// Chế độ bot ép cứng (cartone = luôn đếm, drew = không đếm); chế độ full thì theo /config legit_dem (mặc định BẬT)
+// Đếm legit theo từng server: server đã dùng /config legit_dem thì theo lựa chọn đó,
+// chưa dùng thì lấy mặc định của chế độ bot (drew = tắt, cartone / full = bật)
 const isLegitEnabled = (guildId) => {
-    const forced = profile.forcedLegitCount();
-    if (forced !== null) return forced;
-    return legitEnabled.get(String(guildId)) !== false;
+    const v = legitEnabled.get(String(guildId));
+    return v === undefined ? profile.defaultLegitCount() : v;
 };
 const setLegitEnabled = (guildId, enabled) => { legitEnabled.set(String(guildId), Boolean(enabled)); };
 const clearLegitEnabled = () => legitEnabled.clear();

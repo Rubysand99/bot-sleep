@@ -50,15 +50,12 @@ function buildHelpEmbed(member) {
     }
 
     if (isOwnerId(member?.id, member?.guild)) {
-        const legitCount = profile.forcedLegitCount();
         const owner = pick([
             ['bxh', '`.nhapbxh` + dòng `@khách số_tiền` (mỗi khách 1 dòng): nhập bảng xếp hạng có sẵn, nhập lại không bị cộng trùng.'],
             ['common', '`/owner add|remove|list`: Owner phụ của server này (chỉ Owner gốc thêm / bớt được).'],
             ['common', '`/staff add|remove|list|role`: quản lý Staff và role Staff của server này.'],
             ['common', '`/config set|clear|show`: đặt kênh legit' + (profile.has('autobuy') ? ', vouch, stock, ticket, sold, bill, transcript...' : ', sold...')],
-            ['common', legitCount === null
-                ? '`/config legit_dem bat|tat`: bật / tắt đếm số legit (tắt = chỉ react, lưu theo từng server).'
-                : legitCount ? 'Bot này luôn **đếm số legit** (không tắt được).' : 'Bot này **không đếm số legit**, chỉ react emoji.'],
+            ['common', '`/config legit_dem bat|tat`: bật / tắt đếm số legit (tắt = chỉ react, lưu theo từng server).'],
             ['legit', '`/config legit_count so`: chỉnh số legit hiện tại và đổi tên kênh legit.'],
             ['legit', '`/config check_emoji`: kiểm tra 3 emoji legit và quyền của bot.'],
             ['common', '`/config debug`: chẩn đoán server hiện tại (kênh legit, quyền, emoji, hoạt động legit gần nhất). Dùng khi 1 server không react.'],

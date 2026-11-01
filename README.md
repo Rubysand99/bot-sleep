@@ -11,13 +11,13 @@ Cùng một code, mỗi server một bot riêng (token riêng), chọn bằng bi
 | Bảng xếp hạng + ghi doanh thu (`.bxh`, `/leaderboard`, `.done`, `/done`), **dữ liệu riêng từng server** | ✅ | ✅ |
 | `sold`, `/set_kenhsold`, `.taokenh`, `.xoakenh` | ✅ | ✅ |
 | Auto react legit (3 emoji) | ✅ | ✅ |
-| Đếm số legit + đổi tên kênh `『✅』𝙇𝙀𝙂𝙄𝙏-<số>` | ❌ (chỉ react) | ✅ (luôn đếm) |
+| Đếm số legit + đổi tên kênh `『✅』𝙇𝙀𝙂𝙄𝙏-<số>` (mặc định, chỉnh được bằng `/config legit_dem`) | ❌ (chỉ react) | ✅ (đếm) |
 | Tên thương hiệu trong embed / DM | Drew Store | Cartone |
 
 - `.done @user <số tiền>` dùng được ở **mọi kênh** (vd `.done @khách 150k`). Riêng trong ticket đã ghi doanh thu (Confirm hoặc `.done` trước đó) thì bị chặn để không cộng trùng.
 - `.close` (Staff/Owner): đóng được ticket trong DB **và mọi kênh có chữ `ticket` trong tên** (không phân biệt hoa thường). Kênh không có chữ ticket thì bot bỏ qua; người không phải Staff gõ `.close` ở kênh ticket sẽ bị từ chối.
 
-- Chế độ `drew` / `cartone` **ép cứng** việc đếm legit: `/config legit_dem` không đổi được. Không đặt `BOT_PROFILE` (hoặc `full`) thì chạy như bản cũ, đủ mọi tính năng.
+- Ở chế độ `drew` / `cartone`, đếm legit chỉ khác ở giá trị **mặc định** (drew tắt, cartone bật). Cả hai đều bật / tắt được bằng `/config legit_dem`, lưu riêng từng server. Không đặt `BOT_PROFILE` (hoặc `full`) thì chạy như bản cũ, đủ mọi tính năng.
 - `ALLOWED_GUILD_IDS=<id server>`: bot chỉ phục vụ server đó, bỏ qua mọi server khác (bot vẫn có thể ở server khác chỉ để dùng emoji).
 - Bot không có tính năng nào thì lệnh slash đó **không được đăng ký** (lệnh cũ tự biến mất sau lần khởi động đầu), nút / lệnh prefix tương ứng bị bỏ qua.
 - **Dữ liệu:** cho cả 2 bot dùng chung `MONGODB_URI`, `MONGODB_DB`, `MAIN_GUILD_ID`, `DATA_ENCRYPTION_KEY`, `OWNER_ID` như cũ thì dữ liệu mỗi server (khách, bxh, legit đếm, cấu hình) vẫn nguyên, không phải chuyển gì. Mỗi bot chỉ đọc / ghi dữ liệu của server mình.
@@ -125,7 +125,7 @@ Bot cần quyền **Manage Roles** và role của bot phải nằm **cao hơn** 
 - `/owner add|remove|list`: thêm / bớt **Owner phụ** (đủ quyền Owner). Chỉ Owner gốc (`OWNER_ID`) thêm / bớt được, Owner gốc không thể bị bỏ.
 - `/staff add|remove|list|role`: quản lý Staff.
 - `/config set|clear|show|legit_count`: quản lý kênh / danh mục của bot.
-- `/config legit_dem bat|tat`: bật / tắt đếm số legit, lưu riêng theo ID từng server (mặc định bật). Server tắt: bot vẫn react emoji nhưng không đếm số và không đổi tên kênh. Server bật: đếm, react và đổi tên kênh như bình thường.
+- `/config legit_dem bat|tat`: bật / tắt đếm số legit, lưu riêng theo ID từng server (mặc định: bot drew tắt, bot cartone / full bật). Server tắt: bot vẫn react emoji nhưng không đếm số và không đổi tên kênh. Server bật: đếm, react và đổi tên kênh như bình thường.
 - Kênh legit đặt riêng cho từng server bằng `/config set muc:Kênh legit` (chạy ở server đó). Bộ đếm số legit cũng tách riêng theo server.
 - Mỗi lần bot khởi động / deploy, bot tự quét lại kênh legit của tất cả server (100 tin mới nhất): tin đúng mẫu `+1 legit @người_bán ...` chưa được react thì react bù (server bật đếm thì đếm số theo thứ tự cũ → mới rồi đổi tên kênh), đồng thời cập nhật lại bảng xếp hạng.
 - `.done` (hoặc `/done`): cộng doanh thu cho khách và sửa ngay bảng xếp hạng của mọi server. Mỗi ticket chỉ ghi doanh thu đúng 1 lần (dùng chung với nút Confirm).

@@ -55,6 +55,39 @@ function safeUrl(u) {
     try { const x = new URL(u); return `${x.origin}${x.pathname.replace(/\d{5,}/g, d => '***' + d.slice(-3))}`; } catch (e) { return '(url không hợp lệ)'; }
 }
 
+// Cách gửi ảnh QR (biến môi trường QR_MODE, chỉ áp dụng khi VietQR trả về ảnh PNG/JPEG thật):
+//   link   (mặc định): cho Discord tự tải ảnh qua link (embed.setImage(link)).
+//   attach: bot tải ảnh về rồi đính kèm file (attachment://qr.png).
+// LƯU Ý: img.vietqr.io hiện trả về ảnh SVG (dù đuôi link là .png). Discord KHÔNG hiển thị được SVG
+// (kể cả dạng link lẫn dạng đính kèm), nên khi gặp SVG bot tự đổi sang PNG rồi đính kèm.
+const QR_MODE = () => String(process.env.QR_MODE || 'link').trim().toLowerCase();
+
+// Nhận diện định dạng ảnh qua vài byte đầu (PNG / JPEG / GIF / WEBP / SVG)
+function sniffImage(buf) {
+    if (!buf || buf.length < 4) return 'rong';
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'png';
+    if (buf[0] === 0xff && buf[1] === 0xd8) return 'jpeg';
+    if (buf.slice(0, 3).toString('latin1') === 'GIF') return 'gif';
+    if (buf.slice(0, 4).toString('latin1') === 'RIFF') return 'webp';
+    if (buf.slice(0, 500).toString('utf8').includes('<svg')) return 'svg';
+    return 'khong_ro';
+}
+
+// Đổi SVG -> PNG bằng @napi-rs/canvas (đã có sẵn trong dependencies), nền trắng để mã QR quét được
+async function svgToPng(svgBuffer) {
+    const { createCanvas, loadImage } = require('@napi-rs/canvas');
+    const img = await loadImage(svgBuffer);
+    const scale = img.width > 0 && img.width < 600 ? 600 / img.width : 1;
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = createCanvas(w, h);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return { png: canvas.toBuffer('image/png'), w, h };
+}
+
 async function prepareQrImage(url, ctx = {}) {
     if (!url) return { files: [], imageUrl: null };
     let href;
@@ -66,8 +99,24 @@ async function prepareQrImage(url, ctx = {}) {
     try {
         const res = await axios.get(href, { responseType: 'arraybuffer', timeout: 8000, validateStatus: () => true });
         const type = String(res.headers?.['content-type'] || '');
-        if (res.status === 200 && type.startsWith('image/') && res.data?.length > 0) {
-            return { files: [new AttachmentBuilder(Buffer.from(res.data), { name: 'qr.png' })], imageUrl: 'attachment://qr.png' };
+        const data = Buffer.isBuffer(res.data) ? res.data : Buffer.from(res.data || []);
+        const format = sniffImage(data);
+        log.info('QR', 'Kết quả tải ảnh VietQR', { status: res.status, type, bytes: data.length, dinhdang: format, che_do: QR_MODE(), url: safeUrl(href), ...ctx });
+        if (res.status === 200 && data.length > 0 && (type.startsWith('image/') || format === 'svg')) {
+            if (format === 'svg' || type.includes('svg')) {
+                try {
+                    const { png, w, h } = await svgToPng(data);
+                    log.info('QR', 'Đã đổi SVG sang PNG', { bytes: png.length, rong: w, cao: h, ...ctx });
+                    return { files: [new AttachmentBuilder(png, { name: 'qr.png' })], imageUrl: 'attachment://qr.png' };
+                } catch (convErr) {
+                    log.error('QR', 'Đổi SVG sang PNG THẤT BẠI (Discord không hiển thị được SVG)', { loi: convErr.message, ...ctx });
+                    return { files: [], imageUrl: href };
+                }
+            }
+            if (QR_MODE() === 'attach') {
+                return { files: [new AttachmentBuilder(data, { name: 'qr.png' })], imageUrl: 'attachment://qr.png' };
+            }
+            return { files: [], imageUrl: href };
         }
         log.warn('QR', 'VietQR không trả về ảnh hợp lệ (kiểm tra mã ngân hàng / số tài khoản)', { status: res.status, type, url: safeUrl(href), ...ctx });
     } catch (e) {

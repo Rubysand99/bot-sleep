@@ -41,13 +41,17 @@ t('drew và cartone đều có auto buy + bxh + sold + legit (cùng bộ lệnh)
     for (const p of [d.profile, c.profile]) assert.ok(p.has('autobuy') && p.has('bxh') && p.has('sold') && p.has('legit'));
 });
 
-t('đếm legit: cartone luôn ĐẾM, drew luôn KHÔNG đếm, full theo /config legit_dem', () => {
+t('đếm legit: mặc định cartone / full BẬT, drew TẮT; cả 3 chế độ đều bật / tắt được bằng /config legit_dem', () => {
     let m = load('cartone');
+    assert.strictEqual(m.runtime.isLegitEnabled('G1'), true, 'cartone mặc định đếm');
     m.runtime.setLegitEnabled('G1', false);
-    assert.strictEqual(m.runtime.isLegitEnabled('G1'), true, 'cartone phải luôn đếm dù có tắt');
+    assert.strictEqual(m.runtime.isLegitEnabled('G1'), false, 'cartone tắt được');
+    assert.strictEqual(m.runtime.isLegitEnabled('G2'), true, 'server khác không bị ảnh hưởng');
     m = load('drew');
+    assert.strictEqual(m.runtime.isLegitEnabled('G1'), false, 'drew mặc định không đếm');
     m.runtime.setLegitEnabled('G1', true);
-    assert.strictEqual(m.runtime.isLegitEnabled('G1'), false, 'drew phải luôn không đếm dù có bật');
+    assert.strictEqual(m.runtime.isLegitEnabled('G1'), true, 'drew bật được');
+    assert.strictEqual(m.runtime.isLegitEnabled('G2'), false, 'server khác vẫn theo mặc định');
     m = load('full');
     assert.strictEqual(m.runtime.isLegitEnabled('G1'), true, 'full mặc định bật');
     m.runtime.setLegitEnabled('G1', false);
@@ -62,7 +66,7 @@ t('ALLOWED_GUILD_IDS: chỉ phục vụ server trong danh sách; để trống =
     assert.ok(profile.guildAllowed('333333333333333333'));
 });
 
-t('.help: cả hai có đủ lệnh auto buy + bxh; khác nhau ở phần đếm legit và tên bot', () => {
+t('.help: cả hai có đủ lệnh auto buy + bxh và đều có lệnh bật / tắt đếm legit', () => {
     const OID = '123456789012345678';
     const text = (id) => {
         process.env.OWNER_ID = OID;
@@ -71,7 +75,8 @@ t('.help: cả hai có đủ lệnh auto buy + bxh; khác nhau ở phần đếm
     };
     const drew = text('drew'), cartone = text('cartone');
     for (const x of [drew, cartone]) assert.ok(x.includes('/stock') && x.includes('.bxh') && x.includes('/leaderboard') && x.includes('.done'));
-    assert.ok(drew.includes('không đếm số legit') && cartone.includes('luôn **đếm số legit**'));
+    assert.ok(drew.includes('/config legit_dem') && cartone.includes('/config legit_dem'), 'cả 2 bot đều bật / tắt đếm legit được');
+    assert.ok(!drew.includes('không tắt được') && !cartone.includes('không tắt được'));
 });
 
 t('log QR không lộ số tài khoản', () => {

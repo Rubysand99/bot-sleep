@@ -1,8 +1,9 @@
 // Chế độ chạy của bot, chọn bằng biến môi trường BOT_PROFILE:
-//   drew    : bot Drew Store  = auto buy + bxh + sold + auto react legit (KHÔNG đếm số legit)
-//   cartone : bot Cartone     = auto buy + bxh + sold + auto react legit + ĐẾM số legit
-//   (2 bot có cùng tính năng, chỉ khác: đếm legit, tên thương hiệu. Dữ liệu bxh / khách tách riêng theo server.)
-//   full    : (mặc định) giống bản cũ, đủ mọi tính năng, đếm legit theo /config legit_dem
+//   drew    : bot Drew Store  = auto buy + bxh + sold + auto react legit (mặc định KHÔNG đếm số legit)
+//   cartone : bot Cartone     = auto buy + bxh + sold + auto react legit (mặc định ĐẾM số legit)
+//   (2 bot có cùng tính năng, chỉ khác: giá trị MẶC ĐỊNH của đếm legit, tên thương hiệu. Dữ liệu bxh / khách tách riêng theo server.)
+//   full    : (mặc định) giống bản cũ, đủ mọi tính năng, mặc định đếm legit
+// Cả 3 chế độ đều bật / tắt đếm legit được bằng /config legit_dem (lưu riêng từng server); legitDefault chỉ là giá trị khi server CHƯA chỉnh lệnh.
 // Mỗi bot chạy 1 service riêng với DISCORD_TOKEN / CLIENT_ID / MONGODB_DB riêng.
 
 const FEATURES = {
@@ -10,9 +11,9 @@ const FEATURES = {
     // sold   : gõ "sold", /set_kenhsold, .taokenh / .xoakenh (quản lý kênh bán hàng)
     // bxh    : .bxh, /leaderboard, .done, /done (ghi doanh thu + bảng xếp hạng)
     // legit  : auto react kênh "+1 legit"
-    full:    { autobuy: true,  sold: true, bxh: true,  legit: true, legitCount: null,  name: 'Drew AutoBuy', brand: 'Drew Store' },
-    drew:    { autobuy: true,  sold: true, bxh: true,  legit: true, legitCount: false, name: 'Drew AutoBuy', brand: 'Drew Store' },
-    cartone: { autobuy: true,  sold: true, bxh: true,  legit: true, legitCount: true,  name: 'Cartone Bot',  brand: 'Cartone' }
+    full:    { autobuy: true,  sold: true, bxh: true,  legit: true, legitDefault: true,  name: 'Drew AutoBuy', brand: 'Drew Store' },
+    drew:    { autobuy: true,  sold: true, bxh: true,  legit: true, legitDefault: false, name: 'Drew AutoBuy', brand: 'Drew Store' },
+    cartone: { autobuy: true,  sold: true, bxh: true,  legit: true, legitDefault: true,  name: 'Cartone Bot',  brand: 'Cartone' }
 };
 
 // Lệnh slash theo tính năng. 'common' = bot nào cũng có.
@@ -40,8 +41,8 @@ const has = (feature) => feature === 'common' || Boolean(current()[feature]);
 const commandEnabled = (name) => has(COMMAND_FEATURE[name] || 'common');
 const brand = () => current().brand;
 
-// Đếm legit: true/false nếu chế độ ép cứng, null = theo /config legit_dem
-const forcedLegitCount = () => current().legitCount;
+// Giá trị mặc định của đếm legit khi server chưa dùng /config legit_dem (drew: tắt, cartone / full: bật)
+const defaultLegitCount = () => Boolean(current().legitDefault);
 
 // Chỉ phục vụ các server này (ALLOWED_GUILD_IDS = "id1,id2"). Để trống = mọi server bot có mặt.
 function allowedGuilds() {
@@ -52,4 +53,4 @@ function guildAllowed(guildId) {
     return !list.length || list.includes(String(guildId));
 }
 
-module.exports = { FEATURES, COMMAND_FEATURE, current, has, commandEnabled, brand, forcedLegitCount, allowedGuilds, guildAllowed, resolveName };
+module.exports = { FEATURES, COMMAND_FEATURE, current, has, commandEnabled, brand, defaultLegitCount, allowedGuilds, guildAllowed, resolveName };
