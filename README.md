@@ -11,7 +11,7 @@ Cùng một code, mỗi server một bot riêng (token riêng), chọn bằng bi
 | Bảng xếp hạng + ghi doanh thu (`.bxh`, `/leaderboard`, `.done`, `/done`), **dữ liệu riêng từng server** | ✅ | ✅ |
 | `sold`, `/set_kenhsold`, `.taokenh`, `.xoakenh` | ✅ | ✅ |
 | Auto react legit (3 emoji) | ✅ | ✅ |
-| Đếm số legit + đổi tên kênh `『✅』𝙇𝙀𝙂𝙄𝙏-<số>` (mặc định, chỉnh được bằng `/config legit_dem`) | ❌ (chỉ react) | ✅ (đếm) |
+| Đếm số legit + đổi tên kênh `『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-<số>` (mặc định, chỉnh được bằng `/config legit_dem`) | ❌ (chỉ react) | ✅ (đếm) |
 | Tên thương hiệu trong embed / DM | Drew Store | Cartone |
 
 - `.done @user <số tiền>` dùng được ở **mọi kênh** (vd `.done @khách 150k`). Riêng trong ticket đã ghi doanh thu (Confirm hoặc `.done` trước đó) thì bị chặn để không cộng trùng.
@@ -68,7 +68,8 @@ Mỗi server có dữ liệu riêng: **khách + bảng xếp hạng + tổng ti�
 - Mỗi khách mở tối đa `MAX_OPEN_TICKETS` đơn chưa xác nhận cùng lúc.
 
 ## Kênh legit
-Tin đúng mẫu `+1 legit <@người_bán> ...` thì bot: +1 bộ đếm, react 3 emoji (CanhXanh, minecraft_accept, CanhXanh), và đổi tên kênh thành `『✅』𝙇𝙀𝙂𝙄𝙏-<số>`.
+Tin có **`+1` kèm chữ `legit` hoặc `vouch`** (ở bất kỳ vị trí nào, hoa / thường đều được) thì bot: +1 bộ đếm, react 3 emoji (CanhXanh, minecraft_accept, CanhXanh), và đổi tên kênh thành `『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-<số>`.
+Các cách viết đều nhận: `+1 legit @shop`, `+1legit @shop`, `legit +1 @shop`, `+ 1 legit`, `+1 vouch`, `+1 lgit`, `**+1 legit**`, `Cảm ơn shop, +1 legit @shop`... Không tính tin thiếu `+1` (ví dụ "shop này legit không?") hoặc chỉ có `+1` mà không có chữ legit / vouch. Muốn bắt buộc phải tag người bán thì đặt `LEGIT_REQUIRE_MENTION=true`. Muốn đổi tên kênh mà không sửa code thì đặt biến `LEGIT_CHANNEL_PREFIX` (mặc định `『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-`).
 Discord chỉ cho đổi tên kênh 2 lần / 10 phút nên bot đổi tối đa 1 lần / ~5 phút (luôn lấy số mới nhất).
 Bot cần ở server chứa các emoji trên, và có quyền Manage Channels, Add Reactions, Use External Emojis trong kênh legit.
 Chỉnh số hiện tại bằng `/config legit_count so:632` (legit kế tiếp là 633).

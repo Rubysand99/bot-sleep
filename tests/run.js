@@ -422,7 +422,7 @@ const msgFor = (channel, authorId, content, member) => {
         await index.handleMessage(msgFor(ticketCh, OWNER, '.close', makeMember(OWNER)));
         assert.equal(await db.getTicket(ticketCh.id), null, 'owner đóng được');
     });
-    await test('kênh legit: đúng mẫu thì +1, react đúng 3 emoji, đổi tên 『✅』𝙇𝙀𝙂𝙄𝙏-<số>', async () => {
+    await test('kênh legit: đúng mẫu thì +1, react đúng 3 emoji, đổi tên 『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-<số>', async () => {
         legitUtil.resetLegitRenameState();
         const legitCh = makeChannel('legit', { id: LEGIT_CH });
         const a = msgFor(legitCh, '800000000000000001', 'chào mọi người');
@@ -436,16 +436,16 @@ const msgFor = (channel, authorId, content, member) => {
             '<:minecraft_accept:1556987449996218409>',
             '<a:CanhXanh:1541014174312828968>'
         ]);
-        assert.equal(legitCh.name, '『✅』𝙇𝙀𝙂𝙄𝙏-633');
+        assert.equal(legitCh.name, '『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-633');
 
         const c = msgFor(legitCh, '800000000000000002', `+1 legit <@${SELLER}> acc`);
         await index.handleMessage(c);
         assert.equal(c.reacts.length, 3);
         // lần 2 nằm trong khoảng giãn cách đổi tên: chưa đổi ngay (tránh bị Discord giới hạn), nhưng đã nhớ số mới nhất
-        assert.equal(legitCh.name, '『✅』𝙇𝙀𝙂𝙄𝙏-633');
+        assert.equal(legitCh.name, '『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-633');
         assert.equal(await db.getSetting('LEGIT_COUNT_' + guild.id), 635, 'bộ đếm (riêng theo server) tăng đúng +1 mỗi lần');
         legitUtil.scheduleLegitRename(legitCh, 634, { force: true });
-        assert.equal(legitCh.name, '『✅』𝙇𝙀𝙂𝙄𝙏-634');
+        assert.equal(legitCh.name, '『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-634');
     });
     await test('1 emoji legit lỗi: bot vẫn thả đủ 3 reaction (thay bằng emoji thường), không crash', async () => {
         legitUtil.resetLegitRenameState();
@@ -807,7 +807,7 @@ const msgFor = (channel, authorId, content, member) => {
         legitUtil.resetLegitRenameState();
         const legitCh = registry.get(LEGIT_CH);
         await index.handleInteraction(mkCmd('config', 'legit_count', { opts: { int: 632 } }));
-        assert.equal(legitCh.name, '『✅』𝙇𝙀𝙂𝙄𝙏-632');
+        assert.equal(legitCh.name, '『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-632');
         assert.equal(await db.getSetting('LEGIT_COUNT_' + guild.id), 633);
     });
     await test('/config set: mục Danh mục Sold chọn nhầm kênh thường bị từ chối, chọn đúng danh mục thì lưu', async () => {
@@ -1096,7 +1096,7 @@ const msgFor = (channel, authorId, content, member) => {
         await index.handleMessage(mB);
         assert.equal(mB.reacts.length, 3);
         assert.equal(await db.getSetting('LEGIT_COUNT_GB'), 634, 'server B đếm riêng, bắt đầu từ 633');
-        assert.equal(legitB.name, '『✅』𝙇𝙀𝙂𝙄𝙏-633');
+        assert.equal(legitB.name, '『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-633');
         assert.equal(await db.getSetting('LEGIT_COUNT_' + guild.id), countA, 'số của server B không lẫn sang server A');
     });
     await test('legit_dem lưu theo ID server: khởi động lại vẫn giữ; bật lại thì đếm và đổi tên lại', async () => {
@@ -1147,7 +1147,7 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal(m1.reacts.length, 3); assert.equal(m3.reacts.length, 3);
         for (const m of [m2, m4, m5]) assert.equal(m.reacts.length, 0);
         assert.equal(await db.getSetting('LEGIT_COUNT_S1'), 635, 'm1=633, m3=634 (đúng thứ tự cũ -> mới)');
-        assert.equal(ch.name, '『✅』𝙇𝙀𝙂𝙄𝙏-634', 'server bật đếm: đổi tên kênh theo số cuối');
+        assert.equal(ch.name, '『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-634', 'server bật đếm: đổi tên kênh theo số cuối');
 
         // quét lần nữa trong cùng tiến trình: không react / đếm trùng
         console.log = () => {}; await index.scanLegitChannels(); console.log = log;

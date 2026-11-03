@@ -1,4 +1,4 @@
-// Tên kênh legit: 『✅』𝙇𝙀𝙂𝙄𝙏-<số>. Discord chỉ cho đổi tên 2 lần / 10 phút (tính riêng TỪNG kênh) nên mỗi kênh đổi tối đa
+// Tên kênh legit: 『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-<số> (đổi bằng biến LEGIT_CHANNEL_PREFIX). Discord chỉ cho đổi tên 2 lần / 10 phút (tính riêng TỪNG kênh) nên mỗi kênh đổi tối đa
 // 1 lần / ~5 phút, luôn lấy số mới nhất tại thời điểm đổi (không bao giờ bỏ sót số cuối).
 const C = require('./constants');
 const { log, errInfo, hint } = require('./logger');
@@ -6,6 +6,33 @@ const { log, errInfo, hint } = require('./logger');
 const states = new Map();   // channelId -> { last, timer, latest }
 
 const legitName = (n) => `${C.LEGIT_CHANNEL_PREFIX}${n}`;
+
+// ---- Nhận diện tin legit ------------------------------------------------------------
+// Chấp nhận mọi cách khách hay viết, ví dụ:
+//   +1 legit @shop | +1legit @shop | legit +1 @shop | LEGIT+1 | + 1 legit | ＋1 legit
+//   +1 vouch / +1 vouches | +1 lgit / legitt | **+1 legit** | `+1 legit` | "Cảm ơn shop, +1 legit @shop"
+// Không tính: tin chỉ hỏi "shop này legit không?" (thiếu +1), chỉ có "+1" (thiếu chữ legit), "+10 legit".
+const PLUS_ONE = /\+\s*1(?!\d)|(?<![\d.])1\s*\+(?!\s*\d)/;
+const KEYWORD = /(?<![a-z])(?:le?gg?i?t{1,4}|vouch(?:es|ed|er|ers)?)(?![a-z])/;   // cho phép số dính liền: "+1legit"
+const MENTION = /<@[!&]?\d+>/;
+
+function normalizeLegitText(content) {
+    return String(content || '')
+        .normalize('NFKC')                       // ＋ -> +, chữ toàn-rộng -> thường, ký tự toán học nghiêng đậm -> chữ thường
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')   // ký tự vô hình
+        .replace(/[*_~`|]/g, ' ')                // bỏ định dạng markdown **...**, `...`, ||...||
+        .toLowerCase();
+}
+
+function isLegitMessage(content, { requireMention = C.LEGIT_REQUIRE_MENTION } = {}) {
+    const raw = String(content || '');
+    if (!raw.trim()) return false;
+    const t = normalizeLegitText(raw);
+    // Bỏ phần mention khỏi văn bản trước khi tìm "+1" để ID người dùng không gây nhận nhầm
+    const text = t.replace(/<@[!&]?\d+>/g, ' ');
+    if (!PLUS_ONE.test(text) || !KEYWORD.test(text)) return false;
+    return requireMention ? MENTION.test(raw) : true;
+}
 
 function stateOf(channel) {
     let st = states.get(channel.id);
@@ -46,4 +73,4 @@ function resetLegitRenameState() {
     states.clear();
 }
 
-module.exports = { legitName, scheduleLegitRename, resetLegitRenameState };
+module.exports = { legitName, isLegitMessage, scheduleLegitRename, resetLegitRenameState };

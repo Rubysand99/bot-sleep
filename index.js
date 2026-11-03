@@ -38,7 +38,7 @@ const { buildLeaderboardPayload, refreshLeaderboardMessage } = require('./comman
 const { processDone } = require('./commands/done');
 const { cfg, setGuildResolver, legitChannelFor, getExtraStaff, getExtraOwners, isLegitEnabled, isLegitChannel, getLegitChannelMap } = require('./utils/runtime');
 const { loadConfig, setLegitChannel } = require('./utils/config');
-const { scheduleLegitRename } = require('./utils/legit');
+const { scheduleLegitRename, isLegitMessage } = require('./utils/legit');
 const { log, errInfo, hint, trace } = require('./utils/logger');
 const milestones = require('./utils/milestones');
 const { diagnoseGuild, formatDiagnosis, resolveLegitChannel } = require('./utils/diagnostics');
@@ -1058,7 +1058,7 @@ function markLegitHandled(id) {
 }
 
 // Xử lý 1 tin legit. Luôn thả 3 emoji.
-//  - Server BẬT đếm (mặc định): +1 vào bộ đếm RIÊNG của server, rồi (nếu rename) đổi tên kênh thành 『✅』𝙇𝙀𝙂𝙄𝙏-<số>
+//  - Server BẬT đếm (mặc định): +1 vào bộ đếm RIÊNG của server, rồi (nếu rename) đổi tên kênh thành 『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-<số>
 //  - Server TẮT đếm (/config legit_dem): chỉ react, không đếm số, không đụng tên kênh
 // Trả về số legit vừa đếm, hoặc null nếu không đếm.
 async function reactLegit(message, { rename = true, source = 'tin-moi' } = {}) {
@@ -1146,9 +1146,9 @@ async function scanLegitChannel(channel) {
 
     // Tin legit đúng mẫu mà bot CHƯA react, xử lý từ cũ đến mới để số legit đúng thứ tự
     const todo = [...msgs.values()]
-        .filter(m => !m.author?.bot && C.LEGIT_PATTERN.test(m.content || '') && !hasMyReaction(m))
+        .filter(m => !m.author?.bot && isLegitMessage(m.content) && !hasMyReaction(m))
         .sort((a, b) => (a.createdTimestamp || 0) - (b.createdTimestamp || 0));
-    const matched = [...msgs.values()].filter(m => !m.author?.bot && C.LEGIT_PATTERN.test(m.content || '')).length;
+    const matched = [...msgs.values()].filter(m => !m.author?.bot && isLegitMessage(m.content)).length;
     log.info('LEGIT', 'Quét khởi động: kết quả đọc kênh', { guildId: channel.guildId, channelId: channel.id, doc_duoc: msgs.size, dung_mau: matched, chua_react: todo.length });
 
     let last = null;
@@ -1304,9 +1304,9 @@ async function handleMessageInner(message) {
             if (cmd === '.resend' && db.isTicketChannel(message.channel.id)) return await handleResendCommand(message);
         }
 
-        // 2. Kênh legit của server: chỉ tin đúng mẫu "+1 legit <@người_bán> ..." mới được xử lý (react; server bật đếm thì +1 và đổi tên kênh).
+        // 2. Kênh legit của server: chỉ tin có "+1" và chữ legit / vouch (mọi vị trí, xem isLegitMessage) mới được xử lý (react; server bật đếm thì +1 và đổi tên kênh).
         if (profile.has('legit')) {
-            const looksLegit = C.LEGIT_PATTERN.test(message.content || '');
+            const looksLegit = isLegitMessage(message.content);
             const lctx = { guild: message.guild.name, guildId: message.guild.id, channelId: message.channel.id, msgId: message.id, userId: message.author.id };
             if (isLegitChannel(message.guild.id, message.channel.id)) {
                 if (looksLegit) {
@@ -1323,7 +1323,7 @@ async function handleMessageInner(message) {
                     log.warn('LEGIT', 'Tin trong kênh legit có content RỖNG, bot không đọc được nội dung', { ...lctx, goiy: 'Bật Message Content Intent trong Discord Developer Portal > Bot (bắt buộc)' });
                     trace(message.guild.id, 'skip', 'content rỗng (kiểm tra Message Content Intent)');
                 } else {
-                    log.debug('LEGIT', 'Bỏ qua: tin trong kênh legit KHÔNG đúng mẫu "+1 legit @người_bán ..."', { ...lctx, noidung: (message.content || '').slice(0, 60) });
+                    log.debug('LEGIT', 'Bỏ qua: tin trong kênh legit KHÔNG có "+1" kèm chữ legit / vouch', { ...lctx, noidung: (message.content || '').slice(0, 60) });
                     trace(message.guild.id, 'skip', `không đúng mẫu: "${(message.content || '').slice(0, 40)}"`);
                 }
             } else if (looksLegit) {

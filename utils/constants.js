@@ -33,8 +33,9 @@ module.exports = {
     // Cuối cùng, nếu cả emoji dự phòng cũng lỗi thì dùng emoji thường này (vẫn luôn đủ 3 reaction)
     LEGIT_FALLBACK_REACTIONS: ['✅', '☑️', '🟢'],
 
-    // Tên kênh legit = prefix + số (vd: 『✅』𝙇𝙀𝙂𝙄𝙏-632). Discord giới hạn đổi tên 2 lần / 10 phút
-    LEGIT_CHANNEL_PREFIX: '『✅』𝙇𝙀𝙂𝙄𝙏-',
+    // Tên kênh legit = prefix + số (vd: 『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-632). Discord giới hạn đổi tên 2 lần / 10 phút
+    // Đổi tên mà không cần sửa code bằng biến LEGIT_CHANNEL_PREFIX
+    LEGIT_CHANNEL_PREFIX: fromEnv('LEGIT_CHANNEL_PREFIX', '『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-'),
     LEGIT_RENAME_INTERVAL_MS: 310_000,
 
     // Chống spam kênh legit: cùng 1 người chỉ được đếm 1 lần / số giây này (0 = tắt)
@@ -46,6 +47,7 @@ module.exports = {
     // Ticket CHỈ đóng khi staff/owner gõ .close; kênh bị xóa sau số ms này
     CLOSE_DELAY_MS: 5_000,
 
-    // Mẫu tin nhắn legit hợp lệ: "+1 legit <@người_bán> nội dung"
-    LEGIT_PATTERN: /^\+1\s+legit\s+<@!?\d+>/i
+    // Nhận diện tin legit linh hoạt (xem utils/legit.js > isLegitMessage): có "+1" và chữ legit / vouch ở BẤT KỲ vị trí nào.
+    // Đặt LEGIT_REQUIRE_MENTION=true nếu muốn bắt buộc phải tag (@) người bán mới tính.
+    LEGIT_REQUIRE_MENTION: /^(1|true|yes|on)$/i.test(fromEnv('LEGIT_REQUIRE_MENTION', 'false'))
 };
