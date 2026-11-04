@@ -26,7 +26,7 @@ const { parseAmount, formatVND } = require('./utils/money');
 const { parseAccountForm, maskEmail } = require('./utils/accountForm');
 const { isValidSnowflake, isOwnerId, checkStaffOrOwner } = require('./utils/permissions');
 const { generateTransferMemo, buildVietQRUrl, prepareQrImage } = require('./utils/vietqr');
-const { buildCardRow } = require('./utils/cardButtons');
+const { buildCardRow, setEmojiChecker } = require('./utils/cardButtons');
 const { sendTranscript } = require('./utils/transcript');
 const { stickyCache } = require('./utils/cache');
 const { buildHelpEmbed } = require('./utils/help');
@@ -1616,6 +1616,7 @@ client.on(Events.ChannelDelete || 'channelDelete', async channel => {
 });
 
 client.once(Events.ClientReady || 'ready', async () => {
+    setEmojiChecker(id => client.emojis.cache.has(id));   // nút BUY tự đổi sang emoji thường nếu EMOJI_ONLINE không hợp lệ
     if (client.guilds?.cache) setGuildResolver(id => client.guilds.cache.get(id));   // cấu hình riêng từng server
     console.log(`🤖 Bot đã kết nối: ${client.user.tag}`);
     log.info('READY', 'Bot sẵn sàng', {
