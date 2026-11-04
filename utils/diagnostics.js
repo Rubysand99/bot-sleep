@@ -2,6 +2,7 @@
 // Dùng cho log lúc khởi động và lệnh /config debug.
 const { PermissionFlagsBits } = require('discord.js');
 const C = require('./constants');
+const emojis = require('./emojis');
 const { isLegitEnabled, getLegitChannelMap } = require('./runtime');
 const milestones = require('./milestones');
 const { getTrace } = require('./logger');
@@ -56,7 +57,7 @@ async function diagnoseGuild(client, guild) {
     }
 
     // ---- Emoji ----
-    d.emojis = C.LEGIT_REACTIONS.map(e => {
+    d.emojis = emojis.legitConfigured(guild.id).map(e => {
         const m = String(e).match(/^<a?:(\w+):(\d+)>$/);
         if (!m) return { raw: e, custom: false, visible: true };
         const found = client.emojis.cache.get(m[2]);

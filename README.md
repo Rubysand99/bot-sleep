@@ -67,6 +67,13 @@ Mỗi server có dữ liệu riêng: **khách + bảng xếp hạng + tổng ti�
 - Nếu đơn đã Confirm mà DM chưa gửi được thì staff không đóng được (Owner đóng cưỡng bức được). Bấm **Gửi lại thông tin** hoặc gõ `.resend`.
 - Mỗi khách mở tối đa `MAX_OPEN_TICKETS` đơn chưa xác nhận cùng lúc.
 
+## Emoji của bot (`/emoji`)
+Bot dùng 6 vị trí emoji: `online` (nút BUY / Cách mua), `offline` (dòng "Acc đã được bán"), `info` (dòng Seller trên card) và `legit1`, `legit2`, `legit3` (3 reaction legit). Ưu tiên **emoji custom** cho đẹp, emoji thường chỉ là phương án cuối khi emoji custom không dùng được.
+- `/emoji check`: kiểm tra từng vị trí, bot có thấy emoji không, đang dùng emoji nào (và vị trí nào đang phải dùng emoji thường).
+- `/emoji set vitri:<vị trí> emoji:<...>`: đặt emoji cho server này. Nhập bằng cách chọn từ bảng emoji, hoặc gõ **tên** emoji của server (vd `canhxanh`), hoặc dán mã `<:tên:id>` / ID. Bot từ chối emoji custom mà nó không thấy, để không gây lỗi `COMPONENT_INVALID_EMOJI`.
+- `/emoji list`: xem các emoji custom của server mà bot dùng được. `/emoji reset vitri:<vị trí|all>`: về mặc định.
+- Lưu riêng từng server trong MongoDB, không cần sửa `.env` hay khởi động lại. Nếu server chưa đặt thì dùng biến `EMOJI_ONLINE` / `EMOJI_OFFLINE` / `EMOJI_INFO` / `LEGIT_REACT_EMOJIS` (hoặc giá trị mặc định trong code). Chỉ Owner dùng được.
+
 ## Kênh legit
 Tin có **`+1` kèm chữ `legit` hoặc `vouch`** (ở bất kỳ vị trí nào, hoa / thường đều được) thì bot: +1 bộ đếm, react 3 emoji (CanhXanh, minecraft_accept, CanhXanh), và đổi tên kênh thành `『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-<số>`.
 Các cách viết đều nhận: `+1 legit @shop`, `+1legit @shop`, `legit +1 @shop`, `+ 1 legit`, `+1 vouch`, `+1 lgit`, `**+1 legit**`, `Cảm ơn shop, +1 legit @shop`... Không tính tin thiếu `+1` (ví dụ "shop này legit không?") hoặc chỉ có `+1` mà không có chữ legit / vouch. Muốn bắt buộc phải tag người bán thì đặt `LEGIT_REQUIRE_MENTION=true`. Muốn đổi tên kênh mà không sửa code thì đặt biến `LEGIT_CHANNEL_PREFIX` (mặc định `『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-`).

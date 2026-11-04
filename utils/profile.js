@@ -18,7 +18,7 @@ const FEATURES = {
 
 // Lệnh slash theo tính năng. 'common' = bot nào cũng có.
 const COMMAND_FEATURE = {
-    config: 'common', staff: 'common', owner: 'common', sticky: 'common',
+    config: 'common', emoji: 'common', staff: 'common', owner: 'common', sticky: 'common',
     set_kenhsold: 'sold', taokenh: 'sold', xoakenh: 'sold',
     leaderboard: 'bxh', done: 'bxh',
     add_acc: 'autobuy', stock: 'autobuy', set_qr: 'autobuy', restock: 'autobuy', skin: 'autobuy', moc_role: 'autobuy'

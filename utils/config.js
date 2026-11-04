@@ -1,6 +1,7 @@
 // Lưu / nạp cấu hình do Owner đặt bằng lệnh /config và /staff (bền vững trong MongoDB)
 const db = require('./db');
 const runtime = require('./runtime');
+const emojis = require('./emojis');
 
 // Các mục cấu hình kênh / danh mục mà Owner có thể đặt bằng /config (khóa = tên biến môi trường)
 const CONFIG_KEYS = [
@@ -18,6 +19,7 @@ const CONFIG_KEYS = [
 
 const LEGIT_ENABLED_PREFIX = 'LEGIT_ENABLED_';
 const LEGIT_CHANNEL_PREFIX = 'LEGIT_CH_';
+const EMOJI_PREFIX = 'EMOJI_';
 
 async function loadConfig() {
     runtime.clearOverrides();
@@ -39,6 +41,20 @@ async function loadConfig() {
     for (const s of await db.getSettingsWithPrefix(LEGIT_CHANNEL_PREFIX)) {
         runtime.setLegitChannel(s._id.slice(LEGIT_CHANNEL_PREFIX.length), s.value);
     }
+
+    // Emoji đặt bằng /emoji set (khóa EMOJI_<vị trí>@<guildId>)
+    emojis.clearOverrides();
+    for (const s of await db.getSettingsWithPrefix(EMOJI_PREFIX)) {
+        const m = /^EMOJI_([a-z0-9]+)@(\d+)$/.exec(String(s._id));
+        if (m && emojis.slotOf(m[1]) && typeof s.value === 'string') emojis.setOverride(m[2], m[1], s.value);
+    }
+}
+
+// Lưu emoji của MỘT vị trí cho MỘT server (value = null để quay về mặc định)
+async function setEmojiSlot(guildId, slotKey, value) {
+    if (!emojis.slotOf(slotKey)) throw new Error(`Vị trí emoji không hợp lệ: ${slotKey}`);
+    await db.saveSetting(`${EMOJI_PREFIX}${slotKey}@${guildId}`, value || null);
+    emojis.setOverride(guildId, slotKey, value || null);
 }
 
 // Lưu kênh legit của MỘT server (channelId = null để xóa)
@@ -110,4 +126,4 @@ const removeStaffUser = (userId, guildId) => changeList('STAFF_USERS', guildId, 
 const addOwnerUser = (userId, guildId) => changeList('OWNER_USERS', guildId, userId, true);
 const removeOwnerUser = (userId, guildId) => changeList('OWNER_USERS', guildId, userId, false);
 
-module.exports = { setLegitChannel, setLegitEnabled, addOwnerUser, removeOwnerUser, CONFIG_KEYS, loadConfig, setConfig, addStaffUser, removeStaffUser };
+module.exports = { setLegitChannel, setLegitEnabled, setEmojiSlot, addOwnerUser, removeOwnerUser, CONFIG_KEYS, loadConfig, setConfig, addStaffUser, removeStaffUser };

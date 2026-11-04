@@ -41,6 +41,7 @@ function buildHelpEmbed(member) {
             ['bxh', '`/done customer amount`: ghi doanh thu thủ công' + (profile.has('autobuy') ? ' (không dùng nếu đã Confirm).' : '.')],
             ['bxh', '`/leaderboard`: bảng xếp hạng khách mua nhiều nhất.'],
             ['common', '`/sticky set|remove`: ghim tin nhắn tự động ở kênh.'],
+            ['common', '`/emoji check|set|reset|list`: kiểm tra / đặt các emoji bot dùng (ưu tiên emoji custom, lưu riêng từng server).'],
             ['autobuy', '`/skin username`: xem skin Minecraft.'],
             ['sold', '`/taokenh ten danhmuc`, `/xoakenh kenh|id`: tạo / xóa kênh (slash: chọn danh mục ngay trong lệnh).'],
             ['autobuy', 'Trong ticket: nút **Confirm** và nút **Gửi lại thông tin**.']

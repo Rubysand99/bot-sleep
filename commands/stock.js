@@ -15,6 +15,7 @@ const db = require('../utils/db');
 const C = require('../utils/constants');
 const { formatPriceDisplay } = require('../utils/money');
 const { buildCardRow } = require('../utils/cardButtons');
+const emojis = require('../utils/emojis');
 const { checkStaffOrOwner } = require('../utils/permissions');
 const { cfg } = require('../utils/runtime');
 
@@ -145,11 +146,11 @@ module.exports = {
 
             // Gói card trong Embed và thêm dòng Seller
             const embed = new EmbedBuilder()
-                .setDescription(`${C.EMOJI_INFO} **Seller:** <@${sellerId}>`)
+                .setDescription(`${emojis.text('info', interaction.guildId)} **Seller:** <@${sellerId}>`)
                 .setImage('attachment://card.png')
                 .setColor('#2b2d31');
 
-            const row = buildCardRow('available', username);
+            const row = buildCardRow('available', username, interaction.guildId);
 
             const capeCount = countCapes(capes);
             const priceDisplay = formatPriceDisplay(price);

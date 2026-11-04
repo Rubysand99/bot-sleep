@@ -6,6 +6,7 @@ const { cfg, cfgSource, isLegitEnabled, legitChannelFor } = require('../utils/ru
 const { CONFIG_KEYS, setConfig, setLegitEnabled, setLegitChannel } = require('../utils/config');
 const { legitName, scheduleLegitRename } = require('../utils/legit');
 const { diagnoseGuild, formatDiagnosis } = require('../utils/diagnostics');
+const emojis = require('../utils/emojis');
 
 const choices = CONFIG_KEYS.map(k => ({ name: k.name, value: k.value }));
 const SOURCE_TEXT = { guild: '', db: '(giá trị chung cũ, hãy `/config set` lại cho server này)', env: '(từ biến môi trường)', none: '' };
@@ -80,7 +81,7 @@ module.exports = {
         if (sub === 'check_emoji') {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             const lines = [];
-            for (const emoji of C.LEGIT_REACTIONS) {
+            for (const emoji of emojis.legitConfigured(interaction.guildId)) {
                 const m = String(emoji).match(/^<a?:(\w+):(\d+)>$/);
                 if (!m) { lines.push(`✅ ${emoji} (emoji thường, luôn dùng được)`); continue; }
                 const found = interaction.client.emojis.cache.get(m[2]);
@@ -103,7 +104,7 @@ module.exports = {
             }
             return await interaction.editReply({
                 content: `**Emoji legit**\n${lines.join('\n')}\n\n**Quyền của bot trong kênh legit**\n${perms.join('\n')}\n\n` +
-                    '*Emoji ❌: mời bot vào server chứa emoji đó, hoặc up emoji vào server shop rồi đặt biến `LEGIT_REACT_EMOJIS`.*'
+                    '*Emoji ❌: mời bot vào server chứa emoji đó, hoặc up emoji vào server shop rồi dùng `/emoji set` để đặt lại. Kiểm tra tất cả emoji của bot bằng `/emoji check`.*'
             });
         }
 

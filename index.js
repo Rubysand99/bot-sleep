@@ -26,7 +26,8 @@ const { parseAmount, formatVND } = require('./utils/money');
 const { parseAccountForm, maskEmail } = require('./utils/accountForm');
 const { isValidSnowflake, isOwnerId, checkStaffOrOwner } = require('./utils/permissions');
 const { generateTransferMemo, buildVietQRUrl, prepareQrImage } = require('./utils/vietqr');
-const { buildCardRow, setEmojiChecker } = require('./utils/cardButtons');
+const { buildCardRow } = require('./utils/cardButtons');
+const emojis = require('./utils/emojis');
 const { sendTranscript } = require('./utils/transcript');
 const { stickyCache } = require('./utils/cache');
 const { buildHelpEmbed } = require('./utils/help');
@@ -86,7 +87,7 @@ function vouchChannelRef(guild) {
 
 function soldEmbedDescription(guild) {
     const ref = vouchChannelRef(guild);
-    return `## Acc đã được bán${ref ? ` check ${ref}` : ''} ${C.EMOJI_OFFLINE}`;
+    return `## Acc đã được bán${ref ? ` check ${ref}` : ''} ${emojis.text('offline', guild?.id || guild)}`;
 }
 
 // Đổi tên kênh ở nền (Discord giới hạn 2 lần đổi tên / 10 phút, không để nó chặn luồng chính)
@@ -133,7 +134,7 @@ async function fetchCardMessage(cardChannelId, cardMessageId) {
 
 async function setCardState(cardChannelId, cardMessageId, state, username) {
     const { channel, message } = await fetchCardMessage(cardChannelId, cardMessageId);
-    if (message) await message.edit({ components: [buildCardRow(state, username)] }).catch(() => null);
+    if (message) await message.edit({ components: [buildCardRow(state, username, channel?.guildId)] }).catch(() => null);
     return channel;
 }
 
@@ -436,7 +437,7 @@ async function handleBuyInner(interaction) {
         });
 
         // Card chuyển sang "Đang giao dịch" + đổi tên kênh ✅ -> ⌛
-        const pendingRow = buildCardRow('pending', username);
+        const pendingRow = buildCardRow('pending', username, interaction.guildId);
         if (interaction.message) {
             await interaction.message.edit({ components: [pendingRow] }).catch(() =>
                 setCardState(cardChannelId, cardMessageId, 'pending', username));
@@ -1090,17 +1091,19 @@ async function reactLegit(message, { rename = true, source = 'tin-moi' } = {}) {
     }
 
     const results = [];
-    for (const [i, emoji] of C.LEGIT_REACTIONS.entries()) {
+    const reactList = emojis.legitConfigured(g.id);   // 3 emoji theo cấu hình của server (/emoji set) hoặc mặc định
+    for (const [i, emoji] of reactList.entries()) {
         try {
             await message.react(emoji);
             results.push({ emoji, ok: true });
-            log.debug('LEGIT', `react ${i + 1}/${C.LEGIT_REACTIONS.length} OK`, { ...ctx, emoji });
+            log.debug('LEGIT', `react ${i + 1}/${reactList.length} OK`, { ...ctx, emoji });
         } catch (err) {
             // Thường do bot chưa ở server chứa emoji, emoji đã bị xóa, hoặc kênh thiếu quyền Use External Emojis.
             // Dùng /config check_emoji hoặc /config debug để xem. Thử lần lượt emoji dự phòng của vị trí này,
             // rồi tới emoji thường, để luôn đủ số reaction.
-            log.warn('LEGIT', `react ${i + 1}/${C.LEGIT_REACTIONS.length} THẤT BẠI, thử emoji dự phòng`, { ...ctx, emoji, ...errInfo(err), goiy: hint(err) });
-            const chain = [...(C.LEGIT_BACKUP_REACTIONS[i] || []), C.LEGIT_FALLBACK_REACTIONS[i] || '✅'];
+            log.warn('LEGIT', `react ${i + 1}/${reactList.length} THẤT BẠI, thử emoji dự phòng`, { ...ctx, emoji, ...errInfo(err), goiy: hint(err) });
+            const chain = emojis.reactionChain(i, g.id).filter(e => e !== emoji);   // emoji custom dự phòng trước, emoji thường sau cùng
+            if (!chain.length) chain.push('✅');
             let done = false;
             for (const fb of chain) {
                 try {
@@ -1259,7 +1262,7 @@ async function handleSoldMessage(message) {
     if (cardMsg) {
         const buyBtn = cardMsg.components[0]?.components?.find(c => c.customId?.startsWith('buy_acc_'));
         if (buyBtn) accName = buyBtn.customId.replace('buy_acc_', '').toLowerCase();
-        await cardMsg.edit({ components: [buildCardRow('sold', accName || 'manual')] }).catch(() => null);
+        await cardMsg.edit({ components: [buildCardRow('sold', accName || 'manual', message.guild?.id)] }).catch(() => null);
     }
 
     // Đã bán ngoài hệ thống: đánh dấu SOLD và xóa thông tin đăng nhập khỏi kho
@@ -1616,7 +1619,7 @@ client.on(Events.ChannelDelete || 'channelDelete', async channel => {
 });
 
 client.once(Events.ClientReady || 'ready', async () => {
-    setEmojiChecker(id => client.emojis.cache.has(id));   // nút BUY tự đổi sang emoji thường nếu EMOJI_ONLINE không hợp lệ
+    emojis.setEmojiChecker(id => client.emojis.cache.has(id));   // emoji custom bot không thấy thì tạm dùng emoji thường (xem /emoji check)
     if (client.guilds?.cache) setGuildResolver(id => client.guilds.cache.get(id));   // cấu hình riêng từng server
     console.log(`🤖 Bot đã kết nối: ${client.user.tag}`);
     log.info('READY', 'Bot sẵn sàng', {
