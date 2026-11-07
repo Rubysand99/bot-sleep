@@ -44,6 +44,7 @@ const { log, errInfo, hint, trace } = require('./utils/logger');
 const milestones = require('./utils/milestones');
 const { diagnoseGuild, formatDiagnosis, resolveLegitChannel } = require('./utils/diagnostics');
 const { buildCategoryPicker, isCategoryPicker, handleCategoryPick, deleteChannel, parseChannelId } = require('./utils/channelManager');
+const { moveToSoldCategory } = require('./utils/soldMove');
 
 const EPHEMERAL = MessageFlags.Ephemeral;
 
@@ -667,9 +668,16 @@ async function handleConfirm(interaction) {
         try {
             const cardChannel = await setCardState(cardChannelId, cardMessageId, 'sold', username);
             if (cardChannel) {
-                if (/[✅⌛]/u.test(cardChannel.name || '')) renameInBackground(cardChannel, toSoldName(cardChannel.name));
+                // Chuyển danh mục TRƯỚC, đổi tên SAU: đổi tên bị Discord giới hạn 2 lần / 10 phút và dùng chung hàng đợi
+                // PATCH kênh, nếu đổi tên trước thì lệnh chuyển danh mục có thể bị kẹt phía sau.
                 const soldCatId = await getSoldCategoryId(cardChannel.guild);
-                if (soldCatId) await cardChannel.setParent(soldCatId, { lockPermissions: false }).catch(() => null);
+                const moved = await moveToSoldCategory(cardChannel, soldCatId, cardChannel.guild || interaction.guild);
+                if (!moved.ok) {
+                    log.error('SOLD', 'Confirm: chuyển kênh sang danh mục Sold THẤT BẠI', { channelId: cardChannel.id, kenh: cardChannel.name, danhmuc: soldCatId || '(chưa đặt)', ...(moved.err ? errInfo(moved.err) : {}), vande: moved.problem, goiy: hint(moved.err) });
+                    const warn = await cardChannel.send({ content: `⚠️ Đã bán nhưng **chưa chuyển được kênh sang danh mục Sold**:\n• ${moved.problem}` }).catch(() => null);
+                    if (warn) setTimeout(() => warn.delete().catch(() => null), 60_000);
+                }
+                if (/[✅⌛]/u.test(cardChannel.name || '')) renameInBackground(cardChannel, toSoldName(cardChannel.name));
 
                 const soldEmbed = new EmbedBuilder()
                     .setAuthor({
@@ -1228,32 +1236,17 @@ async function handleSoldMessage(message) {
     }
 
     const problems = [];
-    renameInBackground(channel, toSoldName(channel.name));
 
+    // Chuyển danh mục TRƯỚC, đổi tên SAU (xem ghi chú ở luồng Confirm)
     const soldCatId = await getSoldCategoryId(message.guild);
-    if (!soldCatId) {
-        problems.push('Chưa đặt **danh mục Sold**: dùng `/config set muc:Danh mục chứa kênh đã bán kenh:<danh mục>`.');
-    } else {
-        const cat = await message.guild.channels.fetch(soldCatId).catch(() => null);
-        if (!cat) {
-            problems.push(`Danh mục Sold đang đặt (<#${soldCatId}>) **không thuộc server này** hoặc đã bị xóa. Hãy chạy \`/config set\` ngay trong server này.`);
-        } else if (cat.type !== ChannelType.GuildCategory) {
-            problems.push(`<#${soldCatId}> **không phải là danh mục (category)**, hãy chọn đúng danh mục chứa kênh đã bán.`);
-        } else if (channel.parentId !== cat.id) {
-            try {
-                await channel.setParent(cat.id, { lockPermissions: false });
-                log.info('SOLD', 'Đã chuyển kênh sang danh mục Sold', { ...sctx, danhmuc: cat.id });
-            } catch (err) {
-                log.error('SOLD', 'Chuyển kênh sang danh mục Sold THẤT BẠI', { ...sctx, danhmuc: cat.id, ...errInfo(err), goiy: hint(err) });
-                const full = err?.code === 50035 || /maximum number of channels/i.test(err?.message || '');
-                problems.push(
-                    err?.code === 50013 ? `Bot thiếu quyền **Manage Channels** ở kênh này hoặc ở danh mục ${cat.name}.`
-                        : full ? `Danh mục **${cat.name}** đã đầy (tối đa 50 kênh), hãy tạo thêm danh mục Sold mới và đặt lại bằng \`/config set\`.`
-                        : `Không chuyển được kênh sang **${cat.name}**: ${err?.message || 'lỗi không rõ'}`
-                );
-            }
-        }
+    const moved = await moveToSoldCategory(channel, soldCatId, message.guild);
+    if (moved.moved) {
+        log.info('SOLD', 'Đã chuyển kênh sang danh mục Sold', { ...sctx, danhmuc: moved.category?.id });
+    } else if (!moved.ok) {
+        log.error('SOLD', 'Chuyển kênh sang danh mục Sold THẤT BẠI', { ...sctx, danhmuc: soldCatId || '(chưa đặt)', ...(moved.err ? errInfo(moved.err) : {}), vande: moved.problem, goiy: hint(moved.err) });
+        problems.push(moved.problem);
     }
+    renameInBackground(channel, toSoldName(channel.name));
 
     // Khóa nút trên card
     let accName = account?._id || null;
