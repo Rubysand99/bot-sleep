@@ -45,6 +45,7 @@ const milestones = require('./utils/milestones');
 const { diagnoseGuild, formatDiagnosis, resolveLegitChannel } = require('./utils/diagnostics');
 const { buildCategoryPicker, isCategoryPicker, handleCategoryPick, deleteChannel, parseChannelId } = require('./utils/channelManager');
 const { moveToSoldCategory } = require('./utils/soldMove');
+const { rewardAfterDone, rewardLines, moneyEmoji } = require('./utils/doneRewards');
 
 const EPHEMERAL = MessageFlags.Ephemeral;
 
@@ -621,6 +622,11 @@ async function handleConfirm(interaction) {
     let delivery = 'pending';
     try {
         ({ account, revenue, milestone } = await settleTicket(locked));
+        if (buyerId) {
+            // Tặng role (đã có thì thôi) + thả emoji tin legit; lỗi ở đây không làm hỏng đơn
+            const rewards = await rewardAfterDone({ client, guild: interaction.guild, userId: buyerId, reason: 'Confirm đơn' }).catch(() => null);
+            milestone = [...milestone, ...rewardLines(rewards)];
+        }
 
         const buyerUser = buyerId ? await client.users.fetch(buyerId).catch(() => null) : null;
         let creds = null;
@@ -700,9 +706,15 @@ async function handleConfirm(interaction) {
             const billChannel = await client.channels.fetch(billId.trim()).catch(() => null);
             if (billChannel) {
                 const buyerMention = buyerId ? `<@${buyerId}>` : 'Người mua';
+                const buyerUser = buyerId ? await client.users.fetch(buyerId).catch(() => null) : null;
+                const buyerTag = buyerUser?.username ? `@${buyerUser.username}` : '*(không lấy được username)*';
                 const targetUsername = account?.username || ticket.username || username;
                 const targetPrice = account?.price || ticket.price || 'N/A';
                 const billText = `(${buyerMention}) Đã Mua tài khoản ( ${targetUsername} ) với giá ( ${targetPrice} )`;
+                // Note: nội dung chuyển khoản của đơn (+ ghi chú chung BILL_NOTE nếu shop có đặt)
+                const noteParts = [];
+                if (ticket.transferMemo) noteParts.push(`Nội dung CK: \`${ticket.transferMemo}\``);
+                if ((process.env.BILL_NOTE || '').trim()) noteParts.push(process.env.BILL_NOTE.trim());
 
                 let billAttachment = null;
                 if (account) {
@@ -717,12 +729,17 @@ async function handleConfirm(interaction) {
                     if (billBuffer) billAttachment = new AttachmentBuilder(billBuffer, { name: 'bill_card.png' });
                 }
 
-                if (billAttachment) {
-                    const billEmbed = new EmbedBuilder().setImage('attachment://bill_card.png').setColor('#2b2d31');
-                    await billChannel.send({ content: billText, embeds: [billEmbed], files: [billAttachment] });
-                } else {
-                    await billChannel.send({ content: billText });
-                }
+                const billEmbed = new EmbedBuilder()
+                    .setColor('#2b2d31')
+                    .addFields(
+                        { name: '👤 Người mua', value: `${buyerMention}\n${buyerTag}`, inline: true },
+                        { name: '🎮 Tài khoản', value: `\`${targetUsername}\``, inline: true },
+                        { name: '💰 Giá', value: `\`${targetPrice}\``, inline: true },
+                        { name: '📝 Note', value: noteParts.join('\n') || '*(không có)*' }
+                    )
+                    .setTimestamp();
+                if (billAttachment) billEmbed.setImage('attachment://bill_card.png');
+                await billChannel.send({ content: billText, embeds: [billEmbed], ...(billAttachment ? { files: [billAttachment] } : {}) });
             }
         } catch (billErr) {
             console.error('Lỗi khi gửi card bill vào kênh BILL_ID:', billErr);
@@ -1130,6 +1147,16 @@ async function reactLegit(message, { rename = true, source = 'tin-moi' } = {}) {
             }
         }
         await new Promise(r => setTimeout(r, 200));
+    }
+
+    // Khách đã có đơn (done / Confirm) thì thả thêm emoji tiền. Quét lúc khởi động bỏ qua (chưa có ngữ cảnh dữ liệu server)
+    if (source === 'tin-moi' && moneyEmoji()) {
+        try {
+            const cust = await db.getCustomer(message.author.id);
+            if (cust && (cust.totalOrders > 0 || cust.totalSpent > 0)) await message.react(moneyEmoji());
+        } catch (err) {
+            log.warn('LEGIT', 'Không thả được emoji tiền cho khách đã mua', { ...ctx, ...errInfo(err), goiy: hint(err) });
+        }
     }
 
     const okN = results.filter(r => r.ok).length;

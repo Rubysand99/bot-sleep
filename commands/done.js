@@ -5,6 +5,7 @@ const { checkStaffOrOwner } = require('../utils/permissions');
 const { refreshLeaderboardMessage } = require('./leaderboard');
 const milestones = require('../utils/milestones');
 const { log, errInfo } = require('../utils/logger');
+const { rewardAfterDone, rewardLines } = require('../utils/doneRewards');
 
 // Logic dùng chung cho `.done` (prefix) và `/done` (slash). Trả về { ok:false, msg } hoặc { ok:true, embed }.
 // Sau khi gửi embed, người gọi nên gọi refreshLeaderboardMessage(client) để bảng xếp hạng cập nhật ngay.
@@ -48,6 +49,16 @@ async function processDone({ channelId, customerId, amountText, orders = 1, user
             }), formatVND);
     }
 
+    // Tặng role (đã có thì thôi) + thả emoji tin legit của khách
+    let rewardText = [];
+    if (client) {
+        const guild = client.guilds.cache.get(db.currentGuildId?.() || '') || null;
+        rewardText = rewardLines(await rewardAfterDone({ client, guild, userId: customerId, reason: 'lệnh done' }).catch(err => {
+            log.error('DONE', 'Lỗi khi tặng role / thả emoji sau done', { customerId, ...errInfo(err) });
+            return null;
+        }));
+    }
+
     const embed = new EmbedBuilder()
         .setTitle('✅ GHI NHẬN ĐƠN HÀNG THÀNH CÔNG')
         .setColor('#00FFAA')
@@ -58,7 +69,8 @@ async function processDone({ channelId, customerId, amountText, orders = 1, user
             `**Tổng tích lũy của khách:**\n` +
             `> 💵 Tổng chi tiêu: **${formatVND(updated.totalSpent)}**\n` +
             `> 🛒 Tổng số đơn: **${updated.totalOrders} đơn**` +
-            (milestoneLines.length ? `\n\n${milestoneLines.join('\n')}` : '')
+            (milestoneLines.length ? `\n\n${milestoneLines.join('\n')}` : '') +
+            (rewardText.length ? `\n\n${rewardText.join('\n')}` : '')
         )
         .setFooter({ text: `Xác nhận bởi ${user.username}`, iconURL: user.displayAvatarURL?.() || undefined })
         .setTimestamp();

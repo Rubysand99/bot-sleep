@@ -431,16 +431,18 @@ const msgFor = (channel, authorId, content, member) => {
 
         const b = msgFor(legitCh, '800000000000000001', `+1 legit <@${SELLER}> mfa`);
         await index.handleMessage(b);
+        // khách 800...001 đã có đơn (Confirm ở các bước trước) nên được thả thêm emoji tiền ở cuối
         assert.deepEqual(b.reacts, [
             '<a:CanhXanh:1556987445437014116>',
             '<:minecraft_accept:1556987449996218409>',
-            '<a:CanhXanh:1541014174312828968>'
+            '<a:CanhXanh:1541014174312828968>',
+            '💰'
         ]);
         assert.equal(legitCh.name, '『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-633');
 
-        const c = msgFor(legitCh, '800000000000000002', `+1 legit <@${SELLER}> acc`);
+        const c = msgFor(legitCh, '800000000000000777', `+1 legit <@${SELLER}> acc`);
         await index.handleMessage(c);
-        assert.equal(c.reacts.length, 3);
+        assert.equal(c.reacts.length, 3, 'khách chưa mua thì không có emoji tiền');
         // lần 2 nằm trong khoảng giãn cách đổi tên: chưa đổi ngay (tránh bị Discord giới hạn), nhưng đã nhớ số mới nhất
         assert.equal(legitCh.name, '『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-633');
         assert.equal(await db.getSetting('LEGIT_COUNT_' + guild.id), 635, 'bộ đếm (riêng theo server) tăng đúng +1 mỗi lần');

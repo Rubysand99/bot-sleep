@@ -104,6 +104,13 @@ Khi tổng tiền khách đã mua (Confirm hoặc `.done`) đạt một mốc, b
 - `/moc_role kiemtra khach:@user` xem tổng chi tiêu, mốc đã đạt và mốc kế tiếp của khách.
 Bot cần quyền **Manage Roles** và role của bot phải nằm **cao hơn** các role mốc (Server Settings → Roles). Kết quả cấp role hiện ngay trong embed `.done` / tin giao dịch thành công, và có log thẻ `[MOC]`.
 
+## Sau khi done đơn: tặng role, emoji tin legit, bill
+- **Tặng role:** Owner đặt bằng `/config role_done role:@Role` (để trống ô role = tắt; xem trong `/config show`). Mỗi lần Confirm / `.done` / `/done`, bot tặng role này cho khách, **khách đã có rồi thì bỏ qua**. Role của bot phải nằm **cao hơn** role cần tặng, bot cần quyền Manage Roles.
+- **Emoji tin legit:** sau khi done, bot tìm tin `+1 legit` mới nhất của khách trong kênh legit và thả 3 emoji legit + emoji tiền (`💰`). Khách legit **sau** khi đã mua thì tin legit đó cũng được thả thêm emoji tiền. Đổi emoji bằng `LEGIT_MONEY_EMOJI`, đặt `off` để tắt.
+- **Bill:** embed bill có thêm **username người mua**, tài khoản, giá và **Note** (nội dung chuyển khoản của đơn, cộng ghi chú chung `BILL_NOTE` nếu có đặt).
+- **Danh mục Sold tự mở rộng:** danh mục Sold đủ 50 kênh thì bot tự dùng / tạo `Sold 1`, `Sold 2`, ... (cùng quyền với danh mục gốc, thứ tự tăng dần) và chuyển kênh đã bán vào đó. Bot cần quyền Manage Channels.
+- **Card stock:** nền / viền ảnh card chuyển sang tông tím (`assets/bg1.png`), đồng tiền giữ màu vàng.
+
 ## Danh sách lệnh
 **Prefix (gõ trong chat)**
 | Lệnh | Ai dùng | Tác dụng |
@@ -123,7 +130,7 @@ Bot cần quyền **Manage Roles** và role của bot phải nằm **cao hơn** 
 | Lệnh | Ai dùng |
 |---|---|
 | `/add_acc`, `/stock acc`, `/set_qr`, `/restock`, `/done`, `/leaderboard`, `/sticky set\|remove`, `/skin`, `/taokenh ten [danhmuc]`, `/xoakenh kenh\|id` | Staff/Owner |
-| `/set_kenhsold`, `/config set\|clear\|show\|debug\|legit_dem\|legit_count\|check_emoji`, `/staff add\|remove\|list\|role`, `/moc_role add\|remove\|list\|che_do\|sync\|kiemtra` | Owner |
+| `/set_kenhsold`, `/config set\|clear\|show\|role_done\|debug\|legit_dem\|legit_count\|check_emoji`, `/staff add\|remove\|list\|role`, `/moc_role add\|remove\|list\|che_do\|sync\|kiemtra` | Owner |
 | `/owner list` | Owner |
 | `/owner add\|remove` | Owner gốc (`OWNER_ID`) |
 

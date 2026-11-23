@@ -19,6 +19,9 @@ module.exports = {
         '<a:CanhXanh:1556987445437014116> <:minecraft_accept:1556987449996218409> <a:CanhXanh:1541014174312828968>'
     ).split(/[\s,]+/).filter(Boolean),
 
+    // Emoji "tiền" bot thả thêm vào tin legit của khách đã mua hàng (done / Confirm). Đổi bằng biến LEGIT_MONEY_EMOJI, đặt `off` để tắt
+    LEGIT_MONEY_EMOJI: fromEnv('LEGIT_MONEY_EMOJI', '💰'),
+
     // Emoji DỰ PHÒNG cho emoji thứ 3 (cánh xanh): khi emoji thứ 3 không thả được, thử lần lượt 2 emoji này.
     // Đổi bằng biến LEGIT_REACT_BACKUP_3 (cách nhau bằng dấu cách). Vị trí 1, 2 chưa có dự phòng riêng.
     LEGIT_BACKUP_REACTIONS: [

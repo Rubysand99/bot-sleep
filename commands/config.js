@@ -26,6 +26,8 @@ module.exports = {
         .addSubcommand(sub => sub.setName('legit_dem').setDescription('Bật / tắt đếm số legit cho server này (tắt = chỉ react emoji)')
             .addStringOption(o => o.setName('trangthai').setDescription('Bật hay tắt đếm số legit').setRequired(true)
                 .addChoices({ name: 'Bật', value: 'on' }, { name: 'Tắt', value: 'off' })))
+        .addSubcommand(sub => sub.setName('role_done').setDescription('Đặt role tặng cho khách mỗi khi done 1 đơn (đã có role thì bỏ qua). Bỏ trống ô role = tắt')
+            .addRoleOption(o => o.setName('role').setDescription('Role tặng khi done đơn (để trống để tắt)').setRequired(false)))
         .addSubcommand(sub => sub.setName('legit_count').setDescription('Chỉnh số legit hiện tại (và đổi tên kênh legit)')
             .addIntegerOption(o => o.setName('so').setDescription('Số legit đang hiển thị, vd 632 (legit kế tiếp sẽ là 633)')
                 .setRequired(true).setMinValue(0))),
@@ -35,7 +37,7 @@ module.exports = {
             return await interaction.reply({ content: '❌ Lệnh này chỉ dành riêng cho Owner!', flags: MessageFlags.Ephemeral });
         }
         const sub = interaction.options.getSubcommand();
-        if (['set', 'clear', 'show'].includes(sub) && !interaction.guildId) {
+        if (['set', 'clear', 'show', 'role_done'].includes(sub) && !interaction.guildId) {
             return await interaction.reply({ content: '❌ Cấu hình riêng từng server, hãy dùng lệnh này trong server cần cấu hình.', flags: MessageFlags.Ephemeral });
         }
         const label = (value) => (CONFIG_KEYS.find(k => k.value === value) || {}).name || value;
@@ -56,6 +58,26 @@ module.exports = {
             else await setConfig(key, channel.id, interaction.guildId);
             return await interaction.reply({
                 content: `✅ Đã đặt **${label(key)}** = <#${channel.id}> (\`${channel.id}\`) · chỉ áp dụng cho server **${interaction.guild?.name || interaction.guildId}**`, flags: MessageFlags.Ephemeral
+            });
+        }
+
+        if (sub === 'role_done') {
+            const role = interaction.options.getRole('role');
+            if (!role) {
+                await setConfig('DONE_ROLE_ID', null, interaction.guildId);
+                return await interaction.reply({ content: '✅ Đã **tắt** tặng role khi done đơn ở server này.', flags: MessageFlags.Ephemeral });
+            }
+            if (role.managed || role.id === interaction.guildId) {
+                return await interaction.reply({ content: '❌ Không dùng được role này (role của bot / tích hợp hoặc @everyone). Hãy chọn role thường.', flags: MessageFlags.Ephemeral });
+            }
+            await setConfig('DONE_ROLE_ID', role.id, interaction.guildId);
+            const me = interaction.guild?.members?.me;
+            const warn = me && me.roles.highest.comparePositionTo(role) <= 0
+                ? '\n⚠️ Role của bot đang **thấp hơn hoặc bằng** role này nên chưa tặng được: kéo role bot lên cao hơn trong Server Settings → Roles.'
+                : '';
+            return await interaction.reply({
+                content: `✅ Mỗi khi done 1 đơn, bot sẽ tặng <@&${role.id}> cho khách (đã có thì bỏ qua) · chỉ áp dụng cho server **${interaction.guild?.name || interaction.guildId}**.${warn}`,
+                flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] }
             });
         }
 
@@ -147,7 +169,7 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setTitle(`⚙️ Cấu hình kênh của bot · ${interaction.guild?.name || 'server này'}`)
             .setColor('#00FFAA')
-            .setDescription(lines.join('\n') + `\n• **Đếm số legit (server này)**: ${isLegitEnabled(interaction.guildId) ? '🟢 Bật' : '🔴 Tắt'}`)
+            .setDescription(lines.join('\n') + `\n• **Role tặng khi done đơn**: ${cfg('DONE_ROLE_ID', interaction.guild) ? `<@&${cfg('DONE_ROLE_ID', interaction.guild)}>` : '*(chưa đặt, dùng `/config role_done`)*'}` + `\n• **Đếm số legit (server này)**: ${isLegitEnabled(interaction.guildId) ? '🟢 Bật' : '🔴 Tắt'}`)
             .setFooter({ text: `Tên kênh legit: ${C.LEGIT_CHANNEL_PREFIX}<số>` });
         await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
