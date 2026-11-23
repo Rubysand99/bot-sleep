@@ -20,7 +20,7 @@ for (const file of fontFiles) {
     }
 }
 
-// Font dự phòng đi kèm dự án: trên máy chủ Linux (Railway...) không có sẵn Segoe UI/Arial
+// Font dự phòng đi kèm dự án: trên máy chủ Linux (VPS...) không có sẵn Segoe UI/Arial
 const fallbackFont = path.join(ASSETS_DIR, 'fonts', 'DejaVuSans-Bold.ttf');
 if (fs.existsSync(fallbackFont)) {
     try {

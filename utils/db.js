@@ -1,5 +1,5 @@
 // Tầng dữ liệu MongoDB (thay cho các file JSON cũ).
-// - Dữ liệu bền vững qua các lần deploy (Railway xóa ổ đĩa mỗi lần deploy).
+// - Dữ liệu bền vững qua các lần deploy (không phụ thuộc ổ đĩa của máy chủ, deploy / đổi VPS không mất dữ liệu).
 // - Thao tác quan trọng dùng điều kiện nguyên tử để chống mua trùng / confirm trùng.
 // - Thông tin đăng nhập tài khoản được mã hóa AES-256-GCM trước khi lưu.
 const { MongoClient } = require('mongodb');

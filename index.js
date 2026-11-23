@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: process.env.ENV_FILE || '.env' });   // chạy nhiều bot trên 1 VPS: mỗi bot 1 file env (ENV_FILE=.env.cartone)
 const fs = require('fs');
 const path = require('path');
 const {

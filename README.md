@@ -21,9 +21,9 @@ Cùng một code, mỗi server một bot riêng (token riêng), chọn bằng bi
 - `ALLOWED_GUILD_IDS=<id server>`: bot chỉ phục vụ server đó, bỏ qua mọi server khác (bot vẫn có thể ở server khác chỉ để dùng emoji).
 - Bot không có tính năng nào thì lệnh slash đó **không được đăng ký** (lệnh cũ tự biến mất sau lần khởi động đầu), nút / lệnh prefix tương ứng bị bỏ qua.
 - **Dữ liệu:** cho cả 2 bot dùng chung `MONGODB_URI`, `MONGODB_DB`, `MAIN_GUILD_ID`, `DATA_ENCRYPTION_KEY`, `OWNER_ID` như cũ thì dữ liệu mỗi server (khách, bxh, legit đếm, cấu hình) vẫn nguyên, không phải chuyển gì. Mỗi bot chỉ đọc / ghi dữ liệu của server mình.
-- **Triển khai:** tạo 2 service Railway cùng repo, khác `DISCORD_TOKEN`, `CLIENT_ID`, `BOT_PROFILE`, `ALLOWED_GUILD_IDS`. Application Discord của mỗi bot đều phải bật **Message Content Intent**.
+- **Triển khai (VPS):** chạy 2 tiến trình cùng một code, mỗi bot một file env riêng (`.env.drew`, `.env.cartone`) khác `DISCORD_TOKEN`, `CLIENT_ID`, `BOT_PROFILE`, `ALLOWED_GUILD_IDS`, chỉ định file bằng `ENV_FILE` (xem mục *Deploy trên VPS*). Application Discord của mỗi bot đều phải bật **Message Content Intent**.
 - **Emoji legit:** 3 emoji react là emoji của Drew Store. Bot Cartone phải ở chung server chứa emoji đó (đặt `ALLOWED_GUILD_IDS` để nó không hoạt động ở đó), hoặc up emoji vào server Cartone rồi đặt `LEGIT_REACT_EMOJIS`. Chạy `/config check_emoji` để kiểm tra.
-- **Sao lưu `DATA_ENCRYPTION_KEY`** ở nơi an toàn (trình quản lý mật khẩu, ngoài Railway). Mất khóa là mất toàn bộ thông tin đăng nhập acc trong kho; đổi khóa thì acc cũ không giải mã được. Cả 2 bot phải dùng cùng một khóa.
+- **Sao lưu `DATA_ENCRYPTION_KEY`** ở nơi an toàn (trình quản lý mật khẩu, ngoài VPS). Mất khóa là mất toàn bộ thông tin đăng nhập acc trong kho; đổi khóa thì acc cũ không giải mã được. Cả 2 bot phải dùng cùng một khóa.
 - `DONE_MAX_AMOUNT` (mặc định 100000000): số tiền tối đa cho một lần `.done` / `/done` / dòng `.nhapbxh`, chặn gõ thừa số 0.
 - `.close` chỉ đóng kênh có chữ `ticket` trong tên **và** không phải kênh hệ thống đã cấu hình (transcript, bill, kho, legit, hướng dẫn, danh mục sold).
 - **Version tự tăng:** mỗi lần bot khởi động với code đã đổi (index.js, utils/, commands/, package.json) thì version tăng 0.1 và bot tự ghi vào **mô tả** của mình (`version: 1.3`, hiện ở phần About Me của bot). Restart hoặc deploy lại cùng code thì không tăng; chỉ sửa README / test cũng không tăng. Version lưu trong MongoDB nên 2 bot dùng chung DB luôn cùng số và chỉ tăng đúng 1 lần dù khởi động cùng lúc. Biến tùy chọn: `VERSION_STEP` (mặc định `0.1`, đặt `1` để tăng 1), `VERSION_START` (số khởi đầu khi DB chưa có, mặc định `1`), `VERSION_DESCRIPTION=off` (tắt).
@@ -38,8 +38,8 @@ Cùng một code, mỗi server một bot riêng (token riêng), chọn bằng bi
 4. Discord Developer Portal → Bot → bật **Message Content Intent** (bắt buộc, bot cần đọc `.close`, `sold`, `+1 legit`).
 5. `npm start`
 
-## Biến môi trường (Railway → Variables)
-**Bắt buộc:** `DISCORD_TOKEN`, `CLIENT_ID`, `OWNER_ID`, `MONGODB_URI` (= `${{MongoDB.MONGO_URL}}`), `DATA_ENCRYPTION_KEY`
+## Biến môi trường (file `.env` trên VPS)
+**Bắt buộc:** `DISCORD_TOKEN`, `CLIENT_ID`, `OWNER_ID`, `MONGODB_URI` (chuỗi kết nối MongoDB), `DATA_ENCRYPTION_KEY`
 
 **Nên có:** `STAFF_ROLE_ID`, `STOCK_ID`, `TICKET_CATEGORY_ID`, `SOLD_CATEGORY_ID`, `BILL_ID`, `TRANSCRIPT_ID`, `AUTOREACTER_VOUCH` (kênh legit),
 `KENH_VOUCH`, `KENH_YOUTUBE`, `KENH_2FA`, `KENH_LOCK`, `LINK_QR`, `LEGIT_START`, `VOUCH_MENTION_ID`
@@ -51,7 +51,7 @@ Các biến kênh/danh mục và `STAFF_ROLE_ID` cũng đặt được ngay tron
 ## Dữ liệu theo server
 Mỗi server có dữ liệu riêng: **khách + bảng xếp hạng + tổng tiền, kho tài khoản, ticket, QR (`/set_qr`), nhắc vouch**.
 - **Server chính** (`MAIN_GUILD_ID`) dùng database cũ (`MONGODB_DB`), nên toàn bộ dữ liệu trước đây tự thuộc về server này, không phải chuyển gì.
-- Server khác tự tạo database `<MONGODB_DB>_<ID server>` ở lần đầu bot hoạt động ở đó (tài khoản MongoDB cần quyền tạo database; Railway mặc định có).
+- Server khác tự tạo database `<MONGODB_DB>_<ID server>` ở lần đầu bot hoạt động ở đó (tài khoản MongoDB cần quyền tạo database).
 - Cấu hình (`/config`, `/staff`, `/owner`, bộ đếm legit, mốc role...) vẫn lưu chung trong `settings` vì khóa của chúng đã có ID server.
 - Role mốc chi tiêu chỉ cấp ở server nơi khách mua, dựa trên tổng tiền của server đó.
 - `npm run migrate` luôn ghi vào server chính.
@@ -83,11 +83,11 @@ Chỉnh số hiện tại bằng `/config legit_count so:632` (legit kế tiếp
 Nếu thiếu emoji: chạy `/config check_emoji` để biết emoji nào bot không thấy và quyền còn thiếu. Khi 1 emoji lỗi, bot thả emoji thường thay thế để luôn đủ 3 reaction.
 
 ## Debug khi 1 server không react emoji
-Bot chạy nhiều server thì **mỗi server phải có kênh legit riêng**. Kênh legit KHÔNG đặt bằng biến Railway: mỗi server tự đặt bằng lệnh (chạy NGAY TRONG server đó):
+Bot chạy nhiều server thì **mỗi server phải có kênh legit riêng**. Kênh legit KHÔNG đặt bằng biến trong `.env`: mỗi server tự đặt bằng lệnh (chạy NGAY TRONG server đó):
 `/config set muc:Kênh legit kenh:#kênh-legit`
 Cách tìm nguyên nhân:
 1. Chạy `/config debug` trong server không react: bot liệt kê kênh legit đang dùng, quyền còn thiếu, emoji nào không thấy, và các tin legit gần nhất bot đã nhận / bỏ qua (kèm lý do).
-2. Xem log (Railway → Logs). Mỗi dòng có dạng `thời gian [MỨC] [THẺ] nội dung key=value ...`, các thẻ quan trọng:
+2. Xem log (`pm2 logs <tên bot>`). Mỗi dòng có dạng `thời gian [MỨC] [THẺ] nội dung key=value ...`, các thẻ quan trọng:
    - `[CHANDOAN]` chẩn đoán từng server lúc khởi động (thiếu kênh / thiếu quyền / emoji lỗi).
    - `[LEGIT]` mỗi tin legit: nhận tin, react từng emoji (kèm mã lỗi Discord và gợi ý), kết quả cuối, đổi tên kênh.
      Dòng `Có tin đúng mẫu "+1 legit" nhưng KHÔNG phải kênh legit của server này` = server đó chưa đặt kênh legit.
@@ -150,9 +150,12 @@ Bot cần quyền **Manage Roles** và role của bot phải nằm **cao hơn** 
 `npm run migrate -- <thư_mục_bot_cũ>` (an toàn khi chạy lại, không ghi đè dữ liệu đã có).
 Xong thì xóa thư mục bot cũ vì có chứa mật khẩu dạng chữ thường.
 
-## Deploy Railway
-- Thêm MongoDB, đặt `MONGODB_URI` = `${{MongoDB.MONGO_URL}}` (tên service có thể khác).
-- Thêm các biến ở trên. Start command: `npm start`.
+## Deploy trên VPS
+- Cần Node.js >= 18 và MongoDB (cài trên VPS hoặc dùng Atlas); đặt `MONGODB_URI` trong file env.
+- `git clone`, `npm install`, copy `.env.example` thành `.env` (hoặc `.env.drew.example` thành `.env.drew`, `.env.cartone.example` thành `.env.cartone`) rồi điền biến ở trên.
+- Chạy 1 bot: `pm2 start index.js --name autobuy` (hoặc `npm start`). Chạy 2 bot: `ENV_FILE=.env.drew pm2 start index.js --name bot-drew` và `ENV_FILE=.env.cartone pm2 start index.js --name bot-cartone`, rồi `pm2 save` và `pm2 startup` để tự chạy lại khi VPS khởi động.
+- Cập nhật code: `git pull && npm install && pm2 restart all`. Dữ liệu nằm trong MongoDB nên cập nhật hay đổi VPS không mất.
+- Ổ đĩa VPS giữ nguyên giữa các lần chạy, nhưng vẫn **sao lưu MongoDB** (`mongodump`) và `DATA_ENCRYPTION_KEY`.
 - Không commit `node_modules`, `.env`, `data/`, `kho.json` (đã có trong `.gitignore`).
 
 ## Kiểm thử

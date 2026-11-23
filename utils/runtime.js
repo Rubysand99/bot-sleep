@@ -1,5 +1,5 @@
 // Cấu hình chạy (đọc nhanh, đồng bộ) gồm: ghi đè cấu hình bằng lệnh Discord + danh sách staff thêm bằng /staff.
-// Ưu tiên: /config (lưu DB) > biến môi trường (Railway) > rỗng.
+// Ưu tiên: /config (lưu DB) > biến môi trường (file .env trên VPS) > rỗng.
 const overrides = new Map();
 // Staff / Owner phụ thêm bằng lệnh: tách theo TỪNG server (guildId -> Set userId). Owner gốc (OWNER_ID) có quyền ở mọi server.
 const extraStaff = new Map();

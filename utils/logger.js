@@ -1,4 +1,4 @@
-// Logger có mức độ + thời gian + thẻ phân loại, để debug trên Railway cho dễ.
+// Logger có mức độ + thời gian + thẻ phân loại, để debug trên VPS (pm2 logs / journalctl) cho dễ.
 //   LOG_LEVEL = debug | info | warn | error   (mặc định: debug, tức là log rất chi tiết)
 // Ngoài ra còn lưu "vết" (trace) gần nhất của từng server trong RAM để /config debug đọc được mà không cần mở log.
 const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
