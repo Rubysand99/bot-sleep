@@ -8,9 +8,10 @@ const buttonEmoji = (guildId) => emojis.effective('online', guildId).value;
 // Hàng nút dưới card bán: available (BUY), pending (đang giao dịch), sold (đã bán)
 function buildCardRow(state, username, guildId = null) {
     const lower = String(username).toLowerCase();
-    const guide = (emoji) => new ButtonBuilder()
+    // Nút thứ 2 (bấm vào vẫn hiện hướng dẫn cách mua): nhãn theo trạng thái acc, "Đang bán" hoặc "Đã bán"
+    const guide = (emoji, label = '      Đang bán      ') => new ButtonBuilder()
         .setCustomId('guide_how_to_buy')
-        .setLabel('      Cách mua      ')
+        .setLabel(label)
         .setEmoji(emoji)
         .setStyle(ButtonStyle.Secondary);
 
@@ -33,7 +34,7 @@ function buildCardRow(state, username, guildId = null) {
                 .setEmoji('🔒')
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(true),
-            guide('ℹ️')
+            guide('ℹ️', '      Đã bán      ')
         );
     }
     const emoji = buttonEmoji(guildId);
