@@ -487,6 +487,11 @@ async function handleBuyInner(interaction) {
                 `⚠ Người bán (<@${sellerId || ownerId}>) chưa cài đặt mã QR ngân hàng bằng lệnh \`/set_qr\`! Vui lòng gửi STK trực tiếp tại đây.`;
         }
         log.info('QR', 'Chọn nguồn QR cho ticket', { nguon: qrSource, nguoiBan: targetSellerId, coAnh: !!qrImageUrl });
+        // Lưu phương thức thanh toán để ghi vào bill
+        const paymentMethod = qrSource === 'LINK_QR' ? 'QR của shop (LINK_QR)'
+            : qrSource === 'khong_co' ? 'Chuyển khoản thủ công (staff gửi STK)'
+            : `VietQR · ${sellerQR.bankName}`;
+        await db.updateTicket(ticketChannel.id, { paymentMethod }).catch(() => null);
 
         const embed = new EmbedBuilder()
             .setTitle(`🛒 ĐƠN MUA TÀI KHOẢN: ${account.username.toUpperCase()}`)
@@ -581,6 +586,31 @@ const buildResendRow = (username) => new ActionRowBuilder().addComponents(
         .setCustomId(`ticket_resend_${username}`)
         .setLabel('Gửi lại thông tin').setEmoji('📩').setStyle(ButtonStyle.Primary)
 );
+
+// Khối Note của bill (kênh Điều khoản / Cách đổi thông tin / 2FA / Lưu ý đặt bằng biến, mặc định là kênh của shop)
+const BILL_NOTE_EMOJI = {
+    set: '<a:set:1515523893257961663>', note: '<a:Note:1518023890180378654>', card: '<a:Card:1517922192313160024>',
+    settings: '<:Settings:1519441816976359586>', key: '<a:Key:1517919885034917988>', warning: '<:warning:1528241964527652975>'
+};
+function buildBillNote({ guild, cardChannelId, sellerName }) {
+    const ch = (envName, cfgName, def) => {
+        const v = (cfgName && cfg(cfgName, guild)) || fromEnvTrim(envName) || def;
+        return v ? `<#${v}>` : '*(chưa đặt)*';
+    };
+    const lines = [
+        `--- ${BILL_NOTE_EMOJI.note} Note ---`,
+        `${BILL_NOTE_EMOJI.card} **Card:** ${cardChannelId ? `<#${cardChannelId}>` : '*(không rõ)*'}`,
+        `📜 **Điều khoản:** ${ch('BILL_KENH_DIEUKHOAN', null, '1501940042950775038')}`,
+        `${BILL_NOTE_EMOJI.settings} **Cách đổi thông tin:** ${ch('BILL_KENH_DOITHONGTIN', null, '1501942489521717279')}`,
+        `${BILL_NOTE_EMOJI.key} **Nếu có 2fa:** ${ch('BILL_KENH_2FA', 'KENH_2FA', '1503694287110406274')}`,
+        `${BILL_NOTE_EMOJI.warning} **Lưu ý:** ${ch('BILL_KENH_LUUY', null, '1503695131159691385')}`
+    ];
+    const extra = fromEnvTrim('BILL_NOTE');
+    if (extra) lines.push('', extra);
+    lines.push(`-# ${sellerName || 'shop'} • AutoBuy Bot`);
+    return lines.join('\n');
+}
+function fromEnvTrim(name) { const v = process.env[name]; return v && v.trim() ? v.trim() : ''; }
 
 // ==========================================
 // INTERACTION: NÚT CONFIRM (chỉ chạy được đúng 1 lần cho mỗi đơn)
@@ -708,13 +738,16 @@ async function handleConfirm(interaction) {
                 const buyerMention = buyerId ? `<@${buyerId}>` : 'Người mua';
                 const buyerUser = buyerId ? await client.users.fetch(buyerId).catch(() => null) : null;
                 const buyerTag = buyerUser?.username ? `@${buyerUser.username}` : '*(không lấy được username)*';
+                const sellerId = ticket.sellerId || account?.sellerId || ownerId;
+                const sellerUser = sellerId ? await client.users.fetch(sellerId).catch(() => null) : null;
                 const targetUsername = account?.username || ticket.username || username;
                 const targetPrice = account?.price || ticket.price || 'N/A';
                 const billText = `(${buyerMention}) Đã Mua tài khoản ( ${targetUsername} ) với giá ( ${targetPrice} )`;
-                // Note: nội dung chuyển khoản của đơn (+ ghi chú chung BILL_NOTE nếu shop có đặt)
-                const noteParts = [];
-                if (ticket.transferMemo) noteParts.push(`Nội dung CK: \`${ticket.transferMemo}\``);
-                if ((process.env.BILL_NOTE || '').trim()) noteParts.push(process.env.BILL_NOTE.trim());
+                const noteText = buildBillNote({
+                    guild: interaction.guild,
+                    cardChannelId: ticket.cardChannelId || account?.cardChannelId,
+                    sellerName: sellerUser?.username
+                });
 
                 let billAttachment = null;
                 if (account) {
@@ -729,13 +762,18 @@ async function handleConfirm(interaction) {
                     if (billBuffer) billAttachment = new AttachmentBuilder(billBuffer, { name: 'bill_card.png' });
                 }
 
+                const unix = Math.floor(Date.now() / 1000);
                 const billEmbed = new EmbedBuilder()
                     .setColor('#2b2d31')
+                    .setDescription(`## ${BILL_NOTE_EMOJI.set} BILL ĐƠN HÀNG ${BILL_NOTE_EMOJI.set}\n\n${noteText}`)
                     .addFields(
-                        { name: '👤 Người mua', value: `${buyerMention}\n${buyerTag}`, inline: true },
-                        { name: '🎮 Tài khoản', value: `\`${targetUsername}\``, inline: true },
-                        { name: '💰 Giá', value: `\`${targetPrice}\``, inline: true },
-                        { name: '📝 Note', value: noteParts.join('\n') || '*(không có)*' }
+                        { name: '👤 Buyer', value: `${buyerMention}\n${buyerTag}`, inline: true },
+                        { name: '🧑‍💼 Seller', value: sellerId ? `<@${sellerId}>\n${sellerUser?.username ? `@${sellerUser.username}` : ''}`.trim() : 'N/A', inline: true },
+                        { name: '💰 Đơn giá', value: `\`${targetPrice}\``, inline: true },
+                        { name: '🎮 Tài khoản stock', value: `\`${targetUsername}\``, inline: true },
+                        { name: '💳 Phương thức', value: ticket.paymentMethod || '*(không rõ)*', inline: true },
+                        { name: '📍 Kênh', value: `Ticket: <#${interaction.channelId}>${(ticket.cardChannelId || account?.cardChannelId) ? `\nCard: <#${ticket.cardChannelId || account?.cardChannelId}>` : ''}`, inline: true },
+                        { name: '🕒 Thời gian', value: `<t:${unix}:F> (<t:${unix}:R>)` }
                     )
                     .setTimestamp();
                 if (billAttachment) billEmbed.setImage('attachment://bill_card.png');
