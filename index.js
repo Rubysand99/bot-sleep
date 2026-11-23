@@ -587,27 +587,29 @@ const buildResendRow = (username) => new ActionRowBuilder().addComponents(
         .setLabel('Gửi lại thông tin').setEmoji('📩').setStyle(ButtonStyle.Primary)
 );
 
-// Khối Note của bill (kênh Điều khoản / Cách đổi thông tin / 2FA / Lưu ý đặt bằng biến, mặc định là kênh của shop)
-const BILL_NOTE_EMOJI = {
-    set: '<a:set:1515523893257961663>', note: '<a:Note:1518023890180378654>', card: '<a:Card:1517922192313160024>',
-    settings: '<:Settings:1519441816976359586>', key: '<a:Key:1517919885034917988>', warning: '<:warning:1528241964527652975>'
-};
+// Khối Note của bill. Kênh và emoji đều đặt bằng biến (mỗi server một khác), dòng nào chưa đặt kênh thì bỏ qua.
+//  Kênh:  BILL_KENH_DIEUKHOAN, BILL_KENH_DOITHONGTIN, BILL_KENH_2FA (hoặc KENH_2FA / `/config`), BILL_KENH_LUUY
+//  Emoji: BILL_EMOJI_SET, BILL_EMOJI_NOTE, BILL_EMOJI_CARD, BILL_EMOJI_SETTINGS, BILL_EMOJI_KEY, BILL_EMOJI_WARNING (mặc định là emoji thường)
+//  Khác:  BILL_NOTE (dòng ghi chú chung), BILL_FOOTER (dòng nhỏ cuối Note, mặc định "<username seller> • AutoBuy Bot")
+const billEmoji = (name, def) => fromEnvTrim(`BILL_EMOJI_${name}`) || def;
 function buildBillNote({ guild, cardChannelId, sellerName }) {
-    const ch = (envName, cfgName, def) => {
-        const v = (cfgName && cfg(cfgName, guild)) || fromEnvTrim(envName) || def;
-        return v ? `<#${v}>` : '*(chưa đặt)*';
+    const E = {
+        note: billEmoji('NOTE', '📝'), card: billEmoji('CARD', '🪪'), settings: billEmoji('SETTINGS', '⚙️'),
+        key: billEmoji('KEY', '🔑'), warning: billEmoji('WARNING', '⚠️')
     };
-    const lines = [
-        `--- ${BILL_NOTE_EMOJI.note} Note ---`,
-        `${BILL_NOTE_EMOJI.card} **Card:** ${cardChannelId ? `<#${cardChannelId}>` : '*(không rõ)*'}`,
-        `📜 **Điều khoản:** ${ch('BILL_KENH_DIEUKHOAN', null, '1501940042950775038')}`,
-        `${BILL_NOTE_EMOJI.settings} **Cách đổi thông tin:** ${ch('BILL_KENH_DOITHONGTIN', null, '1501942489521717279')}`,
-        `${BILL_NOTE_EMOJI.key} **Nếu có 2fa:** ${ch('BILL_KENH_2FA', 'KENH_2FA', '1503694287110406274')}`,
-        `${BILL_NOTE_EMOJI.warning} **Lưu ý:** ${ch('BILL_KENH_LUUY', null, '1503695131159691385')}`
+    const chId = (envName, cfgName) => (cfgName && cfg(cfgName, guild)) || fromEnvTrim(envName) || '';
+    const lines = [`--- ${E.note} Note ---`];
+    if (cardChannelId) lines.push(`${E.card} **Card:** <#${cardChannelId}>`);
+    const rows = [
+        ['📜', 'Điều khoản', chId('BILL_KENH_DIEUKHOAN')],
+        [E.settings, 'Cách đổi thông tin', chId('BILL_KENH_DOITHONGTIN')],
+        [E.key, 'Nếu có 2fa', chId('BILL_KENH_2FA', 'KENH_2FA')],
+        [E.warning, 'Lưu ý', chId('BILL_KENH_LUUY')]
     ];
+    for (const [icon, label, id] of rows) if (id && /^\d{17,20}$/.test(id)) lines.push(`${icon} **${label}:** <#${id}>`);
     const extra = fromEnvTrim('BILL_NOTE');
     if (extra) lines.push('', extra);
-    lines.push(`-# ${sellerName || 'shop'} • AutoBuy Bot`);
+    lines.push(`-# ${fromEnvTrim('BILL_FOOTER') || `${sellerName || 'shop'} • AutoBuy Bot`}`);
     return lines.join('\n');
 }
 function fromEnvTrim(name) { const v = process.env[name]; return v && v.trim() ? v.trim() : ''; }
@@ -765,12 +767,14 @@ async function handleConfirm(interaction) {
                 const unix = Math.floor(Date.now() / 1000);
                 const billEmbed = new EmbedBuilder()
                     .setColor('#2b2d31')
-                    .setDescription(`## ${BILL_NOTE_EMOJI.set} BILL ĐƠN HÀNG ${BILL_NOTE_EMOJI.set}\n\n${noteText}`)
+                    .setDescription(`## ${billEmoji('SET', '🧾')} BILL ĐƠN HÀNG ${billEmoji('SET', '🧾')}\n\n${noteText}`)
                     .addFields(
                         { name: '👤 Buyer', value: `${buyerMention}\n${buyerTag}`, inline: true },
                         { name: '🧑‍💼 Seller', value: sellerId ? `<@${sellerId}>\n${sellerUser?.username ? `@${sellerUser.username}` : ''}`.trim() : 'N/A', inline: true },
                         { name: '💰 Đơn giá', value: `\`${targetPrice}\``, inline: true },
                         { name: '🎮 Tài khoản stock', value: `\`${targetUsername}\``, inline: true },
+                        { name: '🏅 Rank', value: String(account?.rank || 'NON').slice(0, 1000), inline: true },
+                        { name: '🧣 Capes', value: String(account?.capes || '').trim().slice(0, 1000) || '*(không có)*', inline: true },
                         { name: '💳 Phương thức', value: ticket.paymentMethod || '*(không rõ)*', inline: true },
                         { name: '📍 Kênh', value: `Ticket: <#${interaction.channelId}>${(ticket.cardChannelId || account?.cardChannelId) ? `\nCard: <#${ticket.cardChannelId || account?.cardChannelId}>` : ''}`, inline: true },
                         { name: '🕒 Thời gian', value: `<t:${unix}:F> (<t:${unix}:R>)` }
