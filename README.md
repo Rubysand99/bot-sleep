@@ -12,7 +12,7 @@ Cùng một code, mỗi server một bot riêng (token riêng), chọn bằng bi
 | `sold`, `/set_kenhsold`, `.taokenh`, `.xoakenh` | ✅ | ✅ |
 | Auto react legit (3 emoji) | ✅ | ✅ |
 | Đếm số legit + đổi tên kênh `『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-<số>` (mặc định, chỉnh được bằng `/config legit_dem`) | ❌ (chỉ react) | ✅ (đếm) |
-| Tên thương hiệu trong embed / DM | Drew Store | Cartone |
+| Tên thương hiệu trong embed / DM | Drew Store | Zin Yeah Store |
 
 - `.done @user <số tiền>` dùng được ở **mọi kênh** (vd `.done @khách 150k`). Riêng trong ticket đã ghi doanh thu (Confirm hoặc `.done` trước đó) thì bị chặn để không cộng trùng.
 - `.close` (Staff/Owner): đóng được ticket trong DB **và mọi kênh có chữ `ticket` trong tên** (không phân biệt hoa thường). Kênh không có chữ ticket thì bot bỏ qua; người không phải Staff gõ `.close` ở kênh ticket sẽ bị từ chối.
@@ -131,12 +131,13 @@ Bot cần quyền **Manage Roles** và role của bot phải nằm **cao hơn** 
 |---|---|
 | `/add_acc`, `/stock acc`, `/set_qr`, `/restock`, `/done`, `/leaderboard`, `/sticky set\|remove`, `/skin`, `/taokenh ten [danhmuc]`, `/xoakenh kenh\|id` | Staff/Owner |
 | `/set_kenhsold`, `/config set\|clear\|show\|role_done\|debug\|legit_dem\|legit_count\|check_emoji`, `/staff add\|remove\|list\|role`, `/moc_role add\|remove\|list\|che_do\|sync\|kiemtra` | Owner |
-| `/owner list` | Owner |
+| `/owner list`, `/bot_avatar [doi_ten]` | Owner |
 | `/owner add\|remove` | Owner gốc (`OWNER_ID`) |
 
 **Nút:** Confirm, Gửi lại thông tin (trong ticket), BUY, Cách mua (trên card), Làm mới (bảng xếp hạng).
 
 ## Lệnh cho Owner
+- `/bot_avatar`: đổi **avatar bot** thành icon của server đang gõ lệnh (ảnh tĩnh PNG). Thêm `doi_ten:True` để đổi luôn **tên bot** thành tên thương hiệu của bot (bot Cartone / profile `cartone` giờ là **Zin Yeah Store**). Avatar và tên là của cả tài khoản bot, Discord giới hạn khoảng 2 lần đổi tên / giờ nên bot không tự đổi lúc khởi động.
 - `/owner add|remove|list`: thêm / bớt **Owner phụ** (đủ quyền Owner). Chỉ Owner gốc (`OWNER_ID`) thêm / bớt được, Owner gốc không thể bị bỏ.
 - `/staff add|remove|list|role`: quản lý Staff.
 - `/config set|clear|show|legit_count`: quản lý kênh / danh mục của bot.

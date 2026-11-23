@@ -1,6 +1,6 @@
 // Chế độ chạy của bot, chọn bằng biến môi trường BOT_PROFILE:
 //   drew    : bot Drew Store  = auto buy + bxh + sold + auto react legit (mặc định KHÔNG đếm số legit)
-//   cartone : bot Cartone     = auto buy + bxh + sold + auto react legit (mặc định ĐẾM số legit)
+//   cartone : bot Zin Yeah Store (profile cũ tên Cartone) = auto buy + bxh + sold + auto react legit (mặc định ĐẾM số legit)
 //   (2 bot có cùng tính năng, chỉ khác: giá trị MẶC ĐỊNH của đếm legit, tên thương hiệu. Dữ liệu bxh / khách tách riêng theo server.)
 //   full    : (mặc định) giống bản cũ, đủ mọi tính năng, mặc định đếm legit
 // Cả 3 chế độ đều bật / tắt đếm legit được bằng /config legit_dem (lưu riêng từng server); legitDefault chỉ là giá trị khi server CHƯA chỉnh lệnh.
@@ -13,12 +13,12 @@ const FEATURES = {
     // legit  : auto react kênh "+1 legit"
     full:    { autobuy: true,  sold: true, bxh: true,  legit: true, legitDefault: true,  name: 'Drew AutoBuy', brand: 'Drew Store' },
     drew:    { autobuy: true,  sold: true, bxh: true,  legit: true, legitDefault: false, name: 'Drew AutoBuy', brand: 'Drew Store' },
-    cartone: { autobuy: true,  sold: true, bxh: true,  legit: true, legitDefault: true,  name: 'Cartone Bot',  brand: 'Cartone' }
+    cartone: { autobuy: true,  sold: true, bxh: true,  legit: true, legitDefault: true,  name: 'Zin Yeah Store', brand: 'Zin Yeah Store' }
 };
 
 // Lệnh slash theo tính năng. 'common' = bot nào cũng có.
 const COMMAND_FEATURE = {
-    config: 'common', emoji: 'common', staff: 'common', owner: 'common', sticky: 'common',
+    config: 'common', emoji: 'common', bot_avatar: 'common', staff: 'common', owner: 'common', sticky: 'common',
     set_kenhsold: 'sold', taokenh: 'sold', xoakenh: 'sold',
     leaderboard: 'bxh', done: 'bxh',
     add_acc: 'autobuy', stock: 'autobuy', set_qr: 'autobuy', restock: 'autobuy', skin: 'autobuy', moc_role: 'autobuy'
