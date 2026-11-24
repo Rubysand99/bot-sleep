@@ -167,3 +167,5 @@ Xong thì xóa thư mục bot cũ vì có chứa mật khẩu dạng chữ thư�
 ## Thông tin đăng nhập tài khoản
 - Lưu mã hóa AES-256-GCM (khóa dẫn xuất bằng scrypt), không lưu nguyên văn form. Dữ liệu mã hóa phiên bản cũ vẫn đọc được.
 - Giao cho khách qua DM thành công thì bị xóa khỏi kho. DM lỗi thì giữ lại để staff bấm "Gửi lại thông tin".
+
+- **Báo lỗi giao acc:** khi giao thông tin / hoàn tất đơn gặp lỗi (không giải mã được kho, không tìm thấy buyer, DM thất bại, lỗi giữa chừng khi Confirm hoặc `.resend`, không xóa được thông tin sau khi giao, không cập nhật card SOLD, không gửi được bill), bot nhắn riêng cho Owner và người bán kèm lý do. Lỗi không phải do buyer tắt DM thì còn đăng cảnh báo và gọi role staff ngay trong ticket. Cảnh báo không bao giờ chứa thông tin đăng nhập; chi tiết lỗi ghi ở log với nhãn `GIAO_ACC`.

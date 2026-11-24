@@ -41,6 +41,7 @@ const { cfg, setGuildResolver, legitChannelFor, getExtraStaff, getExtraOwners, i
 const { loadConfig, setLegitChannel } = require('./utils/config');
 const { scheduleLegitRename, isLegitMessage } = require('./utils/legit');
 const { log, errInfo, hint, trace } = require('./utils/logger');
+const { reportDeliveryProblem, isDmClosed } = require('./utils/deliveryAlert');
 const milestones = require('./utils/milestones');
 const { diagnoseGuild, formatDiagnosis, resolveLegitChannel } = require('./utils/diagnostics');
 const { buildCategoryPicker, isCategoryPicker, handleCategoryPick, deleteChannel, parseChannelId } = require('./utils/channelManager');
@@ -230,7 +231,8 @@ function buildCredentialsEmbed(account, creds, guild) {
         .setTimestamp();
 }
 
-async function sendCredentialsDM(user, account, creds, guild) {
+// out: (tuỳ chọn) object để nhận lỗi gốc ở out.error, giúp báo đúng lý do khi gửi thất bại
+async function sendCredentialsDM(user, account, creds, guild, out = {}) {
     if (!user || !creds) return false;
     try {
         await user.send({
@@ -238,7 +240,8 @@ async function sendCredentialsDM(user, account, creds, guild) {
             embeds: [buildCredentialsEmbed(account, creds, guild)]
         });
         return true;
-    } catch {
+    } catch (err) {
+        out.error = err;
         return false;
     }
 }
@@ -628,6 +631,7 @@ async function handleConfirm(interaction) {
     let revenue = 'zero';
     let milestone = [];
     let delivery = 'pending';
+    let problem = null;   // { stage, err } nếu giao acc gặp trục trặc
     try {
         ({ account, revenue, milestone } = await settleTicket(locked));
         if (buyerId) {
@@ -638,19 +642,43 @@ async function handleConfirm(interaction) {
 
         const buyerUser = buyerId ? await client.users.fetch(buyerId).catch(() => null) : null;
         let creds = null;
+        let credsError = null;
         try {
             creds = await db.getAccountCredentials(username);
         } catch (err) {
+            credsError = err;
             console.error('[LỖI GIẢI MÃ THÔNG TIN TÀI KHOẢN]:', err.message);
         }
         delivery = 'manual';
-        if (creds) {
-            delivery = (await sendCredentialsDM(buyerUser, account, creds, interaction.guild)) ? 'dm' : 'pending';
+        if (credsError) {
+            delivery = 'pending';
+            problem = { stage: 'Không giải mã được thông tin đăng nhập trong kho (kiểm tra DATA_ENCRYPTION_KEY / dữ liệu acc)', err: credsError };
+        } else if (creds) {
+            const out = {};
+            if (!buyerUser) {
+                delivery = 'pending';
+                problem = { stage: 'Không tìm thấy buyer trên Discord nên không gửi được DM' };
+            } else if (await sendCredentialsDM(buyerUser, account, creds, interaction.guild, out)) {
+                delivery = 'dm';
+            } else {
+                delivery = 'pending';
+                problem = { stage: 'Gửi DM thông tin tài khoản cho buyer thất bại', err: out.error };
+            }
         }
-        if (delivery === 'dm') await db.wipeCredentials(username);   // giao xong là xóa khỏi kho
+        if (delivery === 'dm') {
+            // giao xong là xóa khỏi kho; xóa lỗi thì vẫn là đã giao, chỉ báo để xử lý tay
+            await db.wipeCredentials(username).catch(err => reportDeliveryProblem({
+                client, guild: interaction.guild, channel: interaction.channel, ticket, stage: 'Đã gửi DM nhưng KHÔNG xóa được thông tin đăng nhập khỏi kho', err,
+                next: 'Xóa thủ công thông tin đăng nhập của acc này trong kho.', quiet: true
+            }));
+        }
         await db.updateTicket(interaction.channelId, { delivery });
     } catch (err) {
         console.error('[LỖI HOÀN TẤT ĐƠN]:', err);
+        await reportDeliveryProblem({
+            client, guild: interaction.guild, channel: interaction.channel, ticket, stage: 'Hoàn tất đơn sau Confirm bị lỗi (đơn đã khóa)', err,
+            next: 'Staff bấm **Gửi lại thông tin** (hoặc gõ `.resend`) để bot làm tiếp.', quiet: true
+        });
         await interaction.channel.send({
             content: '⚠️ Đơn đã được khóa nhưng gặp lỗi khi hoàn tất. Staff bấm **Gửi lại thông tin** (hoặc gõ `.resend`) để bot làm tiếp phần còn lại.',
             components: [buildResendRow(username)]
@@ -660,7 +688,9 @@ async function handleConfirm(interaction) {
 
     const deliveryText = {
         dm: `Thông tin tài khoản đã được gửi trực tiếp qua tin nhắn riêng (DM) của <@${buyerId}> để bảo mật tuyệt đối!\n\n*Vui lòng kiểm tra hộp thư tin nhắn riêng (DMs) của bạn.*`,
-        pending: `⚠️ Bot **chưa gửi được** thông tin tài khoản vì <@${buyerId}> đang tắt tin nhắn riêng (DM) từ thành viên máy chủ.\n\nHãy bật lại DM, sau đó staff bấm **Gửi lại thông tin**.`,
+        pending: (problem && !isDmClosed(problem.err))
+            ? `⚠️ Bot **chưa gửi được** thông tin tài khoản cho <@${buyerId}>: ${problem.stage}.\n\nOwner và người bán đã được báo. Staff bấm **Gửi lại thông tin** để thử lại.`
+            : `⚠️ Bot **chưa gửi được** thông tin tài khoản vì <@${buyerId}> đang tắt tin nhắn riêng (DM) từ thành viên máy chủ.\n\nHãy bật lại DM, sau đó staff bấm **Gửi lại thông tin**.`,
         manual: `Tài khoản này chưa có thông tin đăng nhập trong kho của bot, staff sẽ bàn giao trực tiếp cho <@${buyerId}>.`
     }[delivery];
 
@@ -674,6 +704,13 @@ async function handleConfirm(interaction) {
         ],
         components: delivery === 'pending' ? [buildResendRow(username)] : []
     });
+    // Báo Owner + người bán (và gọi staff trong ticket nếu lỗi không phải do buyer tắt DM)
+    if (problem) {
+        await reportDeliveryProblem({
+            client, guild: interaction.guild, channel: interaction.channel, ticket, ...problem,
+            next: 'Sau khi xử lý, staff bấm **Gửi lại thông tin** (hoặc gõ `.resend`) trong ticket.', quiet: isDmClosed(problem.err)
+        });
+    }
 
     // Cập nhật card thành SOLD + đổi tên ❌ + chuyển danh mục Sold
     const cardChannelId = ticket.cardChannelId || account?.cardChannelId;
@@ -704,6 +741,7 @@ async function handleConfirm(interaction) {
             }
         } catch (err) {
             console.error('Lỗi khi cập nhật nút SOLD trên card:', err);
+            await reportDeliveryProblem({ client, guild: interaction.guild, channel: interaction.channel, ticket, stage: 'Không cập nhật được card SOLD / chuyển kênh sang danh mục Sold', err, quiet: true });
         }
     }
 
@@ -753,9 +791,12 @@ async function handleConfirm(interaction) {
                     .setTimestamp();
                 if (billAttachment) billEmbed.setImage('attachment://bill_card.png');
                 await billChannel.send({ content: billText, embeds: [billEmbed], ...(billAttachment ? { files: [billAttachment] } : {}) });
+            } else {
+                await reportDeliveryProblem({ client, guild: interaction.guild, channel: interaction.channel, ticket, stage: `Không tìm thấy kênh bill (${billId.trim()}), bill chưa được gửi`, next: 'Kiểm tra BILL_ID / `/config` và quyền xem kênh của bot.', quiet: true });
             }
         } catch (billErr) {
             console.error('Lỗi khi gửi card bill vào kênh BILL_ID:', billErr);
+            await reportDeliveryProblem({ client, guild: interaction.guild, channel: interaction.channel, ticket, stage: 'Không gửi được bill vào kênh bill', err: billErr, quiet: true });
         }
     }
 
@@ -786,11 +827,12 @@ async function handleConfirm(interaction) {
 // ==========================================
 const RESEND_TEXT = {
     dm_failed: '❌ Vẫn chưa gửi được DM cho khách. Hãy nhờ khách bật tin nhắn riêng rồi thử lại.',
-    no_creds: '⚠️ Kho không còn (hoặc không giải mã được) thông tin đăng nhập của tài khoản này. Hãy bàn giao thủ công cho khách.',
+    no_creds: '⚠️ Kho không còn thông tin đăng nhập của tài khoản này. Hãy bàn giao thủ công cho khách.',
+    decrypt_error: '❌ Không giải mã được thông tin đăng nhập trong kho (đã báo Owner). Kiểm tra DATA_ENCRYPTION_KEY rồi thử lại, hoặc bàn giao thủ công.',
     ok: '✅ Đã gửi lại thông tin cho khách qua DM.'
 };
 
-// Trả về 'ok' | 'dm_failed' | 'no_creds'. Làm nốt các bước dở dang (đánh dấu SOLD, ghi doanh thu) trước khi gửi.
+// Trả về 'ok' | 'dm_failed' | 'no_creds' | 'decrypt_error'. Làm nốt các bước dở dang (đánh dấu SOLD, ghi doanh thu) trước khi gửi.
 async function resendCredentials({ channel, guild, ticket }) {
     const username = ticket.usernameLower || String(ticket.username || '').toLowerCase();
     await settleTicket(ticket).catch(err => console.error('[LỖI HOÀN TẤT KHI GỬI LẠI]:', err.message));
@@ -800,15 +842,25 @@ async function resendCredentials({ channel, guild, ticket }) {
         client.users.fetch(ticket.buyerId).catch(() => null)
     ]);
     let creds = null;
-    try { creds = await db.getAccountCredentials(username); } catch (err) { console.error('[LỖI GIẢI MÃ]:', err.message); }
+    try { creds = await db.getAccountCredentials(username); } catch (err) {
+        console.error('[LỖI GIẢI MÃ]:', err.message);
+        await reportDeliveryProblem({ client, guild, channel, ticket, stage: 'Gửi lại: không giải mã được thông tin đăng nhập trong kho', err, quiet: true });
+        return 'decrypt_error';
+    }
 
     if (!creds) {
         await db.updateTicket(channel.id, { delivery: 'manual' });
         return 'no_creds';
     }
-    if (!(await sendCredentialsDM(buyerUser, account, creds, guild))) return 'dm_failed';
+    const dmOut = {};
+    if (!(await sendCredentialsDM(buyerUser, account, creds, guild, dmOut))) {
+        if (!isDmClosed(dmOut.error)) {
+            await reportDeliveryProblem({ client, guild, channel, ticket, stage: buyerUser ? 'Gửi lại: gửi DM cho buyer thất bại' : 'Gửi lại: không tìm thấy buyer trên Discord', err: dmOut.error, quiet: true });
+        }
+        return 'dm_failed';
+    }
 
-    await db.wipeCredentials(username);
+    await db.wipeCredentials(username).catch(err => reportDeliveryProblem({ client, guild, channel, ticket, stage: 'Đã gửi DM nhưng KHÔNG xóa được thông tin đăng nhập khỏi kho', err, next: 'Xóa thủ công thông tin đăng nhập của acc này trong kho.', quiet: true }));
     await db.updateTicket(channel.id, { delivery: 'dm' });
     return 'ok';
 }
@@ -824,7 +876,13 @@ async function handleResend(interaction) {
     }
 
     await interaction.deferReply({ flags: EPHEMERAL });
-    const result = await resendCredentials({ channel: interaction.channel, guild: interaction.guild, ticket });
+    let result;
+    try {
+        result = await resendCredentials({ channel: interaction.channel, guild: interaction.guild, ticket });
+    } catch (err) {
+        await reportDeliveryProblem({ client, guild: interaction.guild, channel: interaction.channel, ticket, stage: 'Gửi lại thông tin bị lỗi', err, quiet: true });
+        return await interaction.editReply({ content: `❌ Lỗi khi gửi lại: ${err.message}. Đã báo Owner.` }).catch(() => null);
+    }
     if (result !== 'ok') return await interaction.editReply({ content: RESEND_TEXT[result] });
 
     await interaction.message?.edit({ components: [] }).catch(() => null);
@@ -842,7 +900,13 @@ async function handleResendCommand(message) {
     if (!ticket.confirmed || ticket.delivery !== 'pending') {
         return await message.reply({ content: 'ℹ️ Không còn thông tin nào cần gửi lại cho đơn này.' }).catch(() => null);
     }
-    const result = await resendCredentials({ channel: message.channel, guild: message.guild, ticket });
+    let result;
+    try {
+        result = await resendCredentials({ channel: message.channel, guild: message.guild, ticket });
+    } catch (err) {
+        await reportDeliveryProblem({ client, guild: message.guild, channel: message.channel, ticket, stage: 'Gửi lại thông tin bị lỗi', err, quiet: true });
+        return await message.reply({ content: `❌ Lỗi khi gửi lại: ${err.message}. Đã báo Owner.` }).catch(() => null);
+    }
     if (result === 'ok') {
         await message.channel.send({ content: `✅ Đã gửi thông tin tài khoản cho <@${ticket.buyerId}> qua DM.` }).catch(() => null);
     } else {

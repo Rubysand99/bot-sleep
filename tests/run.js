@@ -29,6 +29,7 @@ const runtime = require(path.join(root, 'utils/runtime'));
 const legitUtil = require(path.join(root, 'utils/legit'));
 const C = require(path.join(root, 'utils/constants'));
 const { buildStockNote } = require(path.join(root, 'utils/stockNote'));
+const { reportDeliveryProblem } = require(path.join(root, 'utils/deliveryAlert'));
 
 const results = [];
 async function test(name, fn) {
@@ -331,6 +332,11 @@ const msgFor = (channel, authorId, content, member) => {
         await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_dm1', user: { id: SELLER }, member: staffMember(), channel: ticketCh }));
         assert.equal((await db.getTicket(ticketCh.id)).delivery, 'pending');
         assert.ok(await db.getAccountCredentials('dm1'), 'credential phải còn để gửi lại');
+        const alerts = ticketCh.sent.filter(m => JSON.stringify(m).includes('LỖI KHI XỬ LÝ ĐƠN'));
+        assert.equal(alerts.length, 1, 'DM lỗi không rõ nguyên nhân: đăng cảnh báo trong ticket');
+        const alertText = JSON.stringify(alerts[0]);
+        assert.ok(alertText.includes('dm1') && alertText.includes('Cannot send messages to this user'), 'cảnh báo nêu tài khoản và lý do');
+        assert.ok(!/password|Recovery Code|Secret Key/i.test(alertText), 'cảnh báo không chứa thông tin đăng nhập');
 
         const close = msgFor(ticketCh, SELLER, '.close', staffMember());
         await index.handleMessage(close);
@@ -347,6 +353,20 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal(buyer3.dms.length, 1);
         assert.equal(await db.getAccountCredentials('dm1'), null);
         assert.equal((await db.getTicket(ticketCh.id)).delivery, 'dm');
+    });
+
+    await test('reportDeliveryProblem: quiet không đăng trong ticket, báo Owner + người bán, không ném lỗi', async () => {
+        const dms = [];
+        const client = { users: { fetch: async (id) => (id === 'BAD' ? Promise.reject(new Error('x')) : { send: async (x) => { dms.push([id, x]); } }) } };
+        const ch = { id: '123456789012345678', sent: [], async send(x) { this.sent.push(x); } };
+        const ticket = { username: 'abc', buyerId: '800000000000000009', sellerId: SELLER };
+        await reportDeliveryProblem({ client, guild, channel: ch, ticket, stage: 'Bước thử', err: Object.assign(new Error('boom'), { code: 50007 }), quiet: true });
+        assert.equal(ch.sent.length, 0);
+        assert.deepEqual(dms.map(d => d[0]).sort(), [OWNER, SELLER].sort());
+        assert.ok(JSON.stringify(dms[0][1]).includes('tắt tin nhắn riêng'));
+        await reportDeliveryProblem({ client, guild, channel: ch, ticket, stage: 'Bước thử 2' });
+        assert.equal(ch.sent.length, 1);
+        await reportDeliveryProblem({ client: { users: { fetch: async () => { throw new Error('mạng'); } } }, channel: { send: async () => { throw new Error('thiếu quyền'); } }, ticket, stage: 'Không được ném lỗi' });
     });
 
     console.log('\n[7] Close / hủy đơn / dọn dẹp');
