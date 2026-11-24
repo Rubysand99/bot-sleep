@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { runStock } = require('./stock');
 
-// Giống /stock acc: tạo kênh theo giá (✅・150K・1-cape) trong danh mục STOCK_ID, đăng embed có ảnh mẫu MFA + 2 nút (Buy / Cách mua).
+// Giống /stock acc: tạo kênh theo giá (✅・150K・1-cape) trong danh mục LISTING_ID (riêng, không dùng chung với /stock), đăng embed có ảnh mẫu MFA + 2 nút (Buy / Cách mua).
 // Khác: ảnh là mẫu listing (skin 2D, danh sách cape, giá) và embed không có Note.
 module.exports = {
     data: new SlashCommandBuilder()

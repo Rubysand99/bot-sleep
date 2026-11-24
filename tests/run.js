@@ -371,7 +371,10 @@ const msgFor = (channel, authorId, content, member) => {
 
     await test('/dang_anh: như /stock (tạo kênh theo giá, nút Buy, lưu kho) nhưng ảnh listing và không có Note', async () => {
         const { ChannelType } = require('discord.js');
+        const LIST_CAT = '666000000000000001';
         registry.set(STOCK_CAT, { id: STOCK_CAT, name: 'Stock', type: ChannelType.GuildCategory, guildId: 'G' });
+        registry.set(LIST_CAT, { id: LIST_CAT, name: 'Listing', type: ChannelType.GuildCategory, guildId: 'G' });
+        process.env.LISTING_ID = LIST_CAT;
         const listingRenderer = require(path.join(root, 'utils/listingRenderer'));
         const realRender = listingRenderer.renderListing;
         const args = [];
@@ -383,13 +386,13 @@ const msgFor = (channel, authorId, content, member) => {
                 isChatInputCommand: () => true, commandName: 'dang_anh', user: { id: OWNER, bot: false }, member: makeMember(OWNER), client, guild, guildId: guild.id,
                 channelId: 'CUR', channel: makeChannel('lenh'), replies: [], edits: [], deferred: false,
                 options: { getString: (k) => vals[k] ?? null },
-                async reply(x) { this.replies.push(x); }, async deferReply() { this.deferred = true; }, async editReply(x) { this.edits.push(x); }, async followUp(x) { this.replies.push(x); }
+                async reply(x) { this.replies.push(x); }, async deferReply() { this.deferred = true; }, async editReply(x) { this.edits.push(x); return { id: 'M1', channelId: 'CUR' }; }, async followUp(x) { this.replies.push(x); }
             };
             await index.handleInteraction(it);
             assert.equal(guild.channels.created.length, before + 1, 'phải tạo 1 kênh mới');
             const { ch, opts } = guild.channels.created.at(-1);
             assert.equal(opts.name, '✅・150k・1-cape');   // cùng cách đặt tên với /stock
-            assert.equal(opts.parent, STOCK_CAT);
+            assert.equal(opts.parent, LIST_CAT, 'dùng danh mục riêng, không phải STOCK_ID');
             assert.deepEqual(args[0], { username: 'listacc', price: '150k', capes: '<:Pan:111111111111111111>' });
             const posted = ch.sent.at(-1);
             const json = JSON.stringify(posted.embeds[0].toJSON());
@@ -400,7 +403,15 @@ const msgFor = (channel, authorId, content, member) => {
             const acc = await db.getAccount('listacc');
             assert.equal(acc.status, 'AVAILABLE'); assert.equal(acc.price, '150k');
             assert.ok(acc.cardMessageId, 'lưu id tin card để cập nhật SOLD sau này');
-        } finally { listingRenderer.renderListing = realRender; }
+            // Chưa đặt LISTING_ID: không mượn STOCK_ID, đăng tại kênh gõ lệnh
+            delete process.env.LISTING_ID;
+            const n = guild.channels.created.length;
+            vals.username = 'listacc2';
+            const it2 = { ...it, channel: makeChannel('lenh2'), replies: [], edits: [] };
+            await index.handleInteraction(it2);
+            assert.equal(guild.channels.created.length, n, 'không tạo kênh khi chưa đặt LISTING_ID');
+            assert.ok(JSON.stringify(it2.replies).includes('LISTING_ID'), 'nhắc đặt LISTING_ID');
+        } finally { listingRenderer.renderListing = realRender; delete process.env.LISTING_ID; }
     });
 
     console.log('\n[7] Close / hủy đơn / dọn dẹp');
