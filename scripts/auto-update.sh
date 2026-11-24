@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Tự cập nhật bot: có commit mới trên origin/main thì pull, cài thư viện (nếu package đổi) và restart các tiến trình pm2.
+# Tự cập nhật bot: có commit mới trên origin/main thì pull, cài thư viện (nếu package đổi) và restart các service systemd.
 # Chạy định kỳ bằng cron (xem README, mục "Tự cập nhật"). Chỉ restart khi thật sự có code mới.
 #   BRANCH     nhánh theo dõi (mặc định main)
-#   PM2_APPS   tên các tiến trình pm2, cách nhau bằng khoảng trắng (mặc định: bot-drew bot-cartone)
+#   SERVICES   tên các service systemd, cách nhau bằng khoảng trắng (mặc định: bot-sleep-drew.service bot-sleep-cartone.service)
 set -u
 cd "$(dirname "$0")/.." || exit 1
 
 BRANCH="${BRANCH:-main}"
-PM2_APPS="${PM2_APPS:-bot-drew bot-cartone}"
+SERVICES="${SERVICES:-bot-sleep-drew.service bot-sleep-cartone.service}"
 LOCK=/tmp/bot-sleep-autoupdate.lock
 log() { echo "$(date '+%F %T') [auto-update] $*"; }
 
@@ -31,11 +31,7 @@ if echo "$CHANGED" | grep -qE '^package(-lock)?\.json$'; then
   npm install --omit=dev --no-audit --no-fund || { log "npm install lỗi, KHÔNG restart"; exit 1; }
 fi
 
-for app in $PM2_APPS; do
-  if pm2 describe "$app" >/dev/null 2>&1; then
-    pm2 restart "$app" --update-env >/dev/null && log "đã restart $app"
-  else
-    log "không thấy tiến trình pm2 '$app' (xem tên bằng: pm2 ls)"
-  fi
+for svc in $SERVICES; do
+  if systemctl restart "$svc"; then log "đã restart $svc"; else log "restart $svc LỖI (xem: systemctl status $svc)"; fi
 done
 log "Xong, đang chạy ${REMOTE:0:7}"

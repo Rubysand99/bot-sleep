@@ -158,12 +158,12 @@ Xong thì xóa thư mục bot cũ vì có chứa mật khẩu dạng chữ thư�
 - `git clone`, `npm install`, copy `.env.example` thành `.env` (hoặc `.env.drew.example` thành `.env.drew`, `.env.cartone.example` thành `.env.cartone`) rồi điền biến ở trên.
 - Chạy 1 bot: `pm2 start index.js --name autobuy` (hoặc `npm start`). Chạy 2 bot: `ENV_FILE=.env.drew pm2 start index.js --name bot-drew` và `ENV_FILE=.env.cartone pm2 start index.js --name bot-cartone`, rồi `pm2 save` và `pm2 startup` để tự chạy lại khi VPS khởi động.
 - Cập nhật code: `git pull && npm install && pm2 restart all`. Dữ liệu nằm trong MongoDB nên cập nhật hay đổi VPS không mất.
-- **Tự cập nhật (không cần SSH mỗi lần):** `scripts/auto-update.sh` kiểm tra GitHub, có commit mới trên `main` thì tự `git reset --hard origin/main`, `npm install` (chỉ khi package đổi) rồi `pm2 restart` 2 bot. Không có code mới thì không làm gì. Cài 1 lần trên VPS:
+- **Tự cập nhật (không cần SSH mỗi lần):** `scripts/auto-update.sh` kiểm tra GitHub, có commit mới trên `main` thì tự `git reset --hard origin/main`, `npm install` (chỉ khi package đổi) rồi restart 2 service systemd (`bot-sleep-drew.service`, `bot-sleep-cartone.service`). Không có code mới thì không làm gì. Cài 1 lần trên VPS:
   ```
   chmod +x scripts/auto-update.sh
   crontab -e
-  # thêm dòng (kiểm tra mỗi phút; đổi tên tiến trình nếu bạn đặt khác, xem bằng pm2 ls):
-  * * * * * PM2_APPS="bot-drew bot-cartone" /đường/dẫn/bot-sleep/scripts/auto-update.sh >> /tmp/bot-autoupdate.log 2>&1
+  # thêm dòng (kiểm tra mỗi phút; đặt SERVICES="..." nếu tên service khác):
+  * * * * * /root/bot-sleep/scripts/auto-update.sh >> /tmp/bot-autoupdate.log 2>&1
   ```
   Xem lịch sử: `tail -f /tmp/bot-autoupdate.log`. Lưu ý: script dùng `reset --hard` nên mọi sửa tay trong thư mục code trên VPS sẽ bị ghi đè (file `.env*` không bị ảnh hưởng).
 - Ổ đĩa VPS giữ nguyên giữa các lần chạy, nhưng vẫn **sao lưu MongoDB** (`mongodump`) và `DATA_ENCRYPTION_KEY`.
