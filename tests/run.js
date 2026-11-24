@@ -30,6 +30,7 @@ const legitUtil = require(path.join(root, 'utils/legit'));
 const C = require(path.join(root, 'utils/constants'));
 const { buildStockNote } = require(path.join(root, 'utils/stockNote'));
 const { reportDeliveryProblem } = require(path.join(root, 'utils/deliveryAlert'));
+const { parseSetQr } = require(path.join(root, 'utils/prefixSetQr'));
 
 const results = [];
 async function test(name, fn) {
@@ -401,6 +402,34 @@ const msgFor = (channel, authorId, content, member) => {
             assert.equal(acc.status, 'AVAILABLE'); assert.equal(acc.price, '150k');
             assert.ok(acc.cardMessageId, 'lưu id tin card để cập nhật SOLD sau này');
         } finally { listingRenderer.renderListing = realRender; }
+    });
+
+    await test('.setqr: Owner cài / xem VietQR hộ người khác, người thường bị từ chối, sai cú pháp báo rõ', async () => {
+        assert.deepEqual(parseSetQr('.setqr <@800000000000000050> MB 0123456789 Nguyen Van A'),
+            { action: 'set', userId: '800000000000000050', bankName: 'MB', accountNumber: '0123456789', holder: 'NGUYEN VAN A' });
+        assert.equal(parseSetQr('.setqr 800000000000000050 mbbank 1234-5678-90 tran thi b').accountNumber, '1234567890');
+        assert.ok(parseSetQr('.setqr <@800000000000000050> MB abc TEN').error);
+        assert.ok(parseSetQr('.setqr').error);
+        assert.equal(parseSetQr('hello'), null);
+
+        const ch = makeChannel('chat');
+        const deny = msgFor(ch, SELLER, '.setqr <@800000000000000051> MB 0123456789 NGUYEN VAN A', staffMember());
+        await index.handleMessage(deny);
+        assert.ok(JSON.stringify(deny.replies).includes('chỉ dành riêng cho Owner'));
+        assert.equal(await db.getStaffQR('800000000000000051'), null);
+
+        const ok = msgFor(ch, OWNER, '.setqr <@800000000000000051> MB 0123456789 Nguyen Van A');
+        await index.handleMessage(ok);
+        const saved = await db.getStaffQR('800000000000000051');
+        assert.equal(saved.bankName, 'MB'); assert.equal(saved.accountNumber, '0123456789'); assert.equal(saved.bankType, 'NGUYEN VAN A');
+        assert.ok(JSON.stringify(ok.replies).includes('Đã cài thông tin VietQR'));
+
+        const view = msgFor(ch, OWNER, '.setqr xem <@800000000000000051>');
+        await index.handleMessage(view);
+        assert.ok(JSON.stringify(view.replies).includes('0123456789'));
+        const bad = msgFor(ch, OWNER, '.setqr <@800000000000000051> MB 12 X');
+        await index.handleMessage(bad);
+        assert.ok(JSON.stringify(bad.replies).includes('không hợp lệ'));
     });
 
     console.log('\n[7] Close / hủy đơn / dọn dẹp');

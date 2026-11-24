@@ -169,3 +169,5 @@ Xong thì xóa thư mục bot cũ vì có chứa mật khẩu dạng chữ thư�
 - Giao cho khách qua DM thành công thì bị xóa khỏi kho. DM lỗi thì giữ lại để staff bấm "Gửi lại thông tin".
 
 - **Báo lỗi giao acc:** khi giao thông tin / hoàn tất đơn gặp lỗi (không giải mã được kho, không tìm thấy buyer, DM thất bại, lỗi giữa chừng khi Confirm hoặc `.resend`, không xóa được thông tin sau khi giao, không cập nhật card SOLD, không gửi được bill), bot nhắn riêng cho Owner và người bán kèm lý do. Lỗi không phải do buyer tắt DM thì còn đăng cảnh báo và gọi role staff ngay trong ticket. Cảnh báo không bao giờ chứa thông tin đăng nhập; chi tiết lỗi ghi ở log với nhãn `GIAO_ACC`.
+
+- **`.setqr @user MB 0123456789 TEN CHU TK`** (chỉ Owner): cài thông tin VietQR hộ người khác, tương đương họ tự gõ `/set_qr`. Xem lại bằng `.setqr xem @user`. Số tài khoản 6-20 chữ số, tên chủ tài khoản tự viết hoa.

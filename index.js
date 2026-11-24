@@ -42,6 +42,7 @@ const { loadConfig, setLegitChannel } = require('./utils/config');
 const { scheduleLegitRename, isLegitMessage } = require('./utils/legit');
 const { log, errInfo, hint, trace } = require('./utils/logger');
 const { reportDeliveryProblem, isDmClosed } = require('./utils/deliveryAlert');
+const { parseSetQr } = require('./utils/prefixSetQr');
 const milestones = require('./utils/milestones');
 const { diagnoseGuild, formatDiagnosis, resolveLegitChannel } = require('./utils/diagnostics');
 const { buildCategoryPicker, isCategoryPicker, handleCategoryPick, deleteChannel, parseChannelId } = require('./utils/channelManager');
@@ -1386,6 +1387,30 @@ async function handleSoldMessage(message) {
     return true;
 }
 
+// .setqr (chỉ Owner): lưu / xem thông tin ngân hàng VietQR giúp người khác, giống /set_qr
+async function handleSetQrCommand(message) {
+    if (!isOwnerId(message.author.id, message.guild)) {
+        return await message.reply({ content: '❌ Lệnh `.setqr` chỉ dành riêng cho Owner!' }).catch(() => null);
+    }
+    const p = parseSetQr(message.content);
+    if (!p) return;
+    if (p.error) return await message.reply({ content: `❌ ${p.error}` }).catch(() => null);
+
+    if (p.action === 'view') {
+        const qr = await db.getStaffQR(p.userId);
+        return await message.reply({
+            content: qr ? `🏦 <@${p.userId}>: **${qr.bankName}** · \`${qr.accountNumber}\` · ${qr.bankType}` : `ℹ️ <@${p.userId}> chưa cài thông tin ngân hàng.`,
+            allowedMentions: { parse: [] }
+        }).catch(() => null);
+    }
+    await db.saveStaffQR(p.userId, { bankName: p.bankName, accountNumber: p.accountNumber, bankType: p.holder });
+    log.info('QR', 'Owner cài VietQR hộ người khác bằng .setqr', { owner: message.author.id, nguoiNhan: p.userId, nganHang: p.bankName });
+    await message.reply({
+        content: `✅ **Đã cài thông tin VietQR cho <@${p.userId}>!**\n🏦 **Ngân hàng:** ${p.bankName}\n💳 **Số tài khoản:** ${p.accountNumber}\n👤 **Chủ tài khoản:** ${p.holder}\n*Khi khách mua acc do người này đăng, bot sẽ tạo VietQR theo thông tin này.*`,
+        allowedMentions: { parse: [] }
+    }).catch(() => null);
+}
+
 async function handleMessage(message) {
     const guildId = message.guildId || message.guild?.id;
     if (!guildId || message.author?.bot) return;
@@ -1402,6 +1427,7 @@ async function handleMessageInner(message) {
             const cmd = message.content.trim().toLowerCase();
             if (cmd === '.close') return await handleCloseCommand(message);   // ticket trong DB hoặc kênh có chữ "ticket" trong tên
             if (cmd === '.resend' && db.isTicketChannel(message.channel.id)) return await handleResendCommand(message);
+            if (/^\.setqr(\s|$)/i.test(cmd)) return await handleSetQrCommand(message);
         }
 
         // 2. Kênh legit của server: chỉ tin có "+1" và chữ legit / vouch (mọi vị trí, xem isLegitMessage) mới được xử lý (react; server bật đếm thì +1 và đổi tên kênh).
