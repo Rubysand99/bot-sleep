@@ -938,7 +938,7 @@ const isTicketNamed = (channel) => /ticket/i.test(channel?.name || '');
 
 // Kênh hệ thống đã cấu hình (transcript, bill, kho, legit, hướng dẫn...) hoặc nằm trong danh mục kho / sold: KHÔNG bao giờ đóng bằng tên
 function isProtectedChannel(guild, channel) {
-    const keys = ['TRANSCRIPT_ID', 'BILL_ID', 'STOCK_ID', 'LISTING_ID', 'AUTOREACTER_VOUCH', 'KENH_VOUCH', 'KENH_YOUTUBE', 'KENH_2FA', 'KENH_LOCK'];
+    const keys = ['TRANSCRIPT_ID', 'BILL_ID', 'STOCK_ID', 'AUTOREACTER_VOUCH', 'KENH_VOUCH', 'KENH_YOUTUBE', 'KENH_2FA', 'KENH_LOCK'];
     const ids = new Set(keys.map(k => String(cfg(k, guild) || '').trim()).filter(Boolean));
     if (ids.has(channel.id) || (channel.parentId && ids.has(channel.parentId))) return true;
     const soldCat = String(cfg('SOLD_CATEGORY_ID', guild) || '').trim();
@@ -1314,7 +1314,7 @@ async function handleSoldMessage(message) {
     const channel = message.channel;
     const account = await db.findAccountByCardChannel(channel.id);
     const channelHasMark = /[✅⌛]/u.test(channel.name || '');
-    const inStockCategory = ['STOCK_ID', 'LISTING_ID'].some(k => isValidSnowflake(cfg(k, message.guild)) && channel.parentId === cfg(k, message.guild));
+    const inStockCategory = isValidSnowflake(cfg('STOCK_ID', message.guild)) && channel.parentId === cfg('STOCK_ID', message.guild);
 
     const sctx = { guild: message.guild.name, guildId: message.guild.id, channelId: channel.id, kenh: channel.name, userId: message.author.id };
     log.info('SOLD', 'Nhận lệnh sold', { ...sctx, co_tai_khoan: Boolean(account), kenh_co_dau: channelHasMark, trong_danh_muc_stock: inStockCategory, cha: channel.parentId || '(không có)', STOCK_ID: cfg('STOCK_ID', message.guild) || '(chưa đặt)', SOLD_CATEGORY_ID: cfg('SOLD_CATEGORY_ID', message.guild) || '(chưa đặt)' });

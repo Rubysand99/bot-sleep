@@ -70,7 +70,7 @@ module.exports = {
     }
 };
 
-// Dùng chung cho /stock acc (danh mục STOCK_ID) và /dang_anh (danh mục LISTING_ID): tạo kênh theo giá, đăng embed (ảnh + nút Buy / Cách mua).
+// Dùng chung cho /stock acc và /dang_anh: tạo kênh theo giá trong danh mục STOCK_ID, đăng embed (ảnh + nút Buy / Cách mua).
 //  listing = true  (/dang_anh): ảnh mẫu MFA listing (skin 2D, cape, giá), embed KHÔNG có Note
 //  listing = false (/stock acc): ảnh card cũ, embed có Note
 async function runStock(interaction, { listing = false } = {}) {
@@ -172,8 +172,7 @@ async function runStock(interaction, { listing = false } = {}) {
             const priceDisplay = formatPriceDisplay(price);
 
             // Xác định vị trí đăng
-            // /dang_anh và /stock là 2 mảng riêng: mỗi bên một danh mục (LISTING_ID / STOCK_ID), không dùng chung
-            const stockId = cfg(listing ? 'LISTING_ID' : 'STOCK_ID', interaction.guild);
+            const stockId = cfg('STOCK_ID', interaction.guild);
             let targetChannel = interaction.channel;
             let isDifferentChannel = false;
 
@@ -290,14 +289,6 @@ async function runStock(interaction, { listing = false } = {}) {
                 cardMessageId: replyMessage.id,
                 cardChannelId: replyMessage.channelId
             });
-
-            if (listing && !stockId) {
-                await interaction.followUp({
-                    content: '⚠️ Chưa đặt danh mục cho **/dang_anh** nên bot đăng ngay tại kênh này (không tạo kênh theo giá). ' +
-                             'Dùng `/config set` mục **LISTING_ID** (danh mục riêng, không dùng chung với stock) rồi đăng lại.',
-                    flags: MessageFlags.Ephemeral
-                }).catch(() => null);
-            }
 
             if (!storedAcc || !storedAcc.hasCredentials) {
                 await interaction.followUp({

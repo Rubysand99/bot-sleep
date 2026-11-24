@@ -8,7 +8,6 @@ const CONFIG_KEYS = [
     { value: 'AUTOREACTER_VOUCH', name: 'Kênh legit (đếm, react, tự đổi tên)' },
     { value: 'KENH_VOUCH', name: 'Kênh vouch (hiện trong tin nhắn bot)' },
     { value: 'STOCK_ID', name: 'Kho stock (kênh hoặc danh mục đăng card)' },
-    { value: 'LISTING_ID', name: 'Kho ảnh MFA (/dang_anh: kênh hoặc danh mục đăng, tách riêng khỏi stock)' },
     { value: 'TICKET_CATEGORY_ID', name: 'Danh mục chứa ticket' },
     { value: 'SOLD_CATEGORY_ID', name: 'Danh mục chứa kênh đã bán' },
     { value: 'BILL_ID', name: 'Kênh gửi bill' },
