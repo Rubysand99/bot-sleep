@@ -11,7 +11,6 @@ const {
     OverwriteType 
 } = require('discord.js');
 const { renderCard } = require('../utils/cardRenderer');
-const listingRenderer = require('../utils/listingRenderer');
 const db = require('../utils/db');
 const C = require('../utils/constants');
 const { formatPriceDisplay } = require('../utils/money');
@@ -63,21 +62,16 @@ module.exports = {
                         .setRequired(false))
         ),
 
-    runStock,
+    resolveStockTarget,
 
     async execute(interaction) {
         return runStock(interaction);
     }
 };
 
-// Dùng chung cho /stock acc và /dang_anh: tạo kênh theo giá trong danh mục STOCK_ID, đăng embed (ảnh + nút Buy / Cách mua).
-//  listing = true  (/dang_anh): ảnh mẫu MFA listing (skin 2D, cape, giá), embed KHÔNG có Note
-//  listing = false (/stock acc): ảnh card cũ, embed có Note
-async function runStock(interaction, { listing = false } = {}) {
+// /stock acc: tạo kênh theo giá trong danh mục STOCK_ID, đăng card (ảnh + Note + nút Buy / Cách mua).
+async function runStock(interaction) {
     {
-        const ownerId = process.env.OWNER_ID;
-        const staffRoleId = cfg('STAFF_ROLE_ID', interaction.guild);
-
         if (!checkStaffOrOwner(interaction.member)) {
             return await interaction.reply({ 
                 content: '❌ Bạn không có quyền đăng bán tài khoản (Chỉ dành cho Staff hoặc Owner)!', 
@@ -130,16 +124,14 @@ async function runStock(interaction, { listing = false } = {}) {
             const uniqueCapes = Array.from(new Set(foundEmojis));
             capes = uniqueCapes.join(' ');
 
-            const imageBuffer = listing
-                ? await listingRenderer.renderListing({ username, price, capes })
-                : await renderCard({
-                    username,
-                    price,
-                    rank,
-                    capes,
-                    statshpx,
-                    statsdonut
-                });
+            const imageBuffer = await renderCard({
+                username,
+                price,
+                rank,
+                capes,
+                statshpx,
+                statsdonut
+            });
 
             if (!imageBuffer) {
                 return await interaction.editReply({ content: '❌ Không thể tạo ảnh card!' });
@@ -160,7 +152,7 @@ async function runStock(interaction, { listing = false } = {}) {
             });
 
             // Gói card trong Embed và thêm dòng Seller
-            const stockNote = listing ? '' : buildStockNote({ guild: interaction.guild });
+            const stockNote = buildStockNote({ guild: interaction.guild });
             const embed = new EmbedBuilder()
                 .setDescription(`${emojis.text('info', interaction.guildId)} **Seller:** <@${sellerId}>` + (stockNote ? `\n\n${stockNote}` : ''))
                 .setImage('attachment://card.png')
@@ -171,99 +163,8 @@ async function runStock(interaction, { listing = false } = {}) {
             const capeCount = countCapes(capes);
             const priceDisplay = formatPriceDisplay(price);
 
-            // Xác định vị trí đăng
-            const stockId = cfg('STOCK_ID', interaction.guild);
-            let targetChannel = interaction.channel;
-            let isDifferentChannel = false;
-
-            if (stockId && /^\d{17,20}$/.test(stockId.trim())) {
-                try {
-                    const cleanStockId = stockId.trim();
-                    const target = interaction.guild.channels.cache.get(cleanStockId) || 
-                                   await interaction.guild.channels.fetch(cleanStockId).catch(() => null);
-
-                    if (target) {
-                        if (target.type === ChannelType.GuildText || target.type === ChannelType.GuildAnnouncement) {
-                            targetChannel = target;
-                            isDifferentChannel = (targetChannel.id !== interaction.channelId);
-                        } else if (target.type === ChannelType.GuildCategory) {
-                            const channelName = `✅・${priceDisplay}・${capeCount}-cape`;
-
-                            const permissionOverwrites = [
-                                {
-                                    id: interaction.guild.roles.everyone.id,
-                                    type: OverwriteType.Role,
-                                    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
-                                    deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions]
-                                },
-                                {
-                                    id: interaction.client.user.id,
-                                    type: OverwriteType.Member,
-                                    allow: [
-                                        PermissionFlagsBits.ViewChannel,
-                                        PermissionFlagsBits.SendMessages,
-                                        PermissionFlagsBits.EmbedLinks,
-                                        PermissionFlagsBits.AttachFiles,
-                                        PermissionFlagsBits.ManageChannels,
-                                        PermissionFlagsBits.ManageMessages
-                                    ]
-                                },
-                                {
-                                    id: interaction.user.id,
-                                    type: OverwriteType.Member,
-                                    allow: [
-                                        PermissionFlagsBits.ViewChannel,
-                                        PermissionFlagsBits.SendMessages,
-                                        PermissionFlagsBits.ManageChannels,
-                                        PermissionFlagsBits.ManageMessages,
-                                        PermissionFlagsBits.AttachFiles,
-                                        PermissionFlagsBits.EmbedLinks,
-                                        PermissionFlagsBits.ReadMessageHistory
-                                    ]
-                                }
-                            ];
-
-                            if (staffRoleId && /^\d{17,20}$/.test(staffRoleId.trim())) {
-                                permissionOverwrites.push({
-                                    id: staffRoleId.trim(),
-                                    type: OverwriteType.Role,
-                                    deny: [
-                                        PermissionFlagsBits.SendMessages,
-                                        PermissionFlagsBits.ManageChannels,
-                                        PermissionFlagsBits.ManageMessages
-                                    ]
-                                });
-                            }
-
-                            if (ownerId && /^\d{17,20}$/.test(ownerId.trim()) && ownerId.trim() !== interaction.user.id) {
-                                permissionOverwrites.push({
-                                    id: ownerId.trim(),
-                                    type: OverwriteType.Member,
-                                    allow: [
-                                        PermissionFlagsBits.ViewChannel,
-                                        PermissionFlagsBits.SendMessages,
-                                        PermissionFlagsBits.ManageChannels,
-                                        PermissionFlagsBits.ManageMessages,
-                                        PermissionFlagsBits.AttachFiles,
-                                        PermissionFlagsBits.EmbedLinks,
-                                        PermissionFlagsBits.ReadMessageHistory
-                                    ]
-                                });
-                            }
-
-                            targetChannel = await interaction.guild.channels.create({
-                                name: channelName,
-                                type: ChannelType.GuildText,
-                                parent: target.id,
-                                permissionOverwrites
-                            });
-                            isDifferentChannel = true;
-                        }
-                    }
-                } catch (err) {
-                    console.error('[LỖI STOCK_ID]:', err);
-                }
-            }
+            // Xác định vị trí đăng (danh mục STOCK_ID: tạo kênh mới theo giá; kênh: đăng thẳng; chưa đặt: đăng tại chỗ)
+            const { targetChannel, isDifferentChannel } = await resolveStockTarget(interaction, `✅・${priceDisplay}・${capeCount}-cape`);
 
             let replyMessage;
             if (isDifferentChannel) {
@@ -305,4 +206,103 @@ async function runStock(interaction, { listing = false } = {}) {
             }
         }
     }
+}
+
+// Tìm nơi đăng card theo STOCK_ID. Dùng chung cho /stock acc và /dang_anh.
+// Trả về { targetChannel, isDifferentChannel }; channelName = tên kênh nếu STOCK_ID là danh mục (sẽ tạo kênh mới).
+async function resolveStockTarget(interaction, channelName) {
+    const ownerId = process.env.OWNER_ID;
+    const staffRoleId = cfg('STAFF_ROLE_ID', interaction.guild);
+    const stockId = cfg('STOCK_ID', interaction.guild);
+    let targetChannel = interaction.channel;
+    let isDifferentChannel = false;
+
+    if (stockId && /^\d{17,20}$/.test(stockId.trim())) {
+        try {
+            const cleanStockId = stockId.trim();
+            const target = interaction.guild.channels.cache.get(cleanStockId) || 
+                           await interaction.guild.channels.fetch(cleanStockId).catch(() => null);
+
+            if (target) {
+                if (target.type === ChannelType.GuildText || target.type === ChannelType.GuildAnnouncement) {
+                    targetChannel = target;
+                    isDifferentChannel = (targetChannel.id !== interaction.channelId);
+                } else if (target.type === ChannelType.GuildCategory) {
+                    
+                    const permissionOverwrites = [
+                        {
+                            id: interaction.guild.roles.everyone.id,
+                            type: OverwriteType.Role,
+                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+                            deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions]
+                        },
+                        {
+                            id: interaction.client.user.id,
+                            type: OverwriteType.Member,
+                            allow: [
+                                PermissionFlagsBits.ViewChannel,
+                                PermissionFlagsBits.SendMessages,
+                                PermissionFlagsBits.EmbedLinks,
+                                PermissionFlagsBits.AttachFiles,
+                                PermissionFlagsBits.ManageChannels,
+                                PermissionFlagsBits.ManageMessages
+                            ]
+                        },
+                        {
+                            id: interaction.user.id,
+                            type: OverwriteType.Member,
+                            allow: [
+                                PermissionFlagsBits.ViewChannel,
+                                PermissionFlagsBits.SendMessages,
+                                PermissionFlagsBits.ManageChannels,
+                                PermissionFlagsBits.ManageMessages,
+                                PermissionFlagsBits.AttachFiles,
+                                PermissionFlagsBits.EmbedLinks,
+                                PermissionFlagsBits.ReadMessageHistory
+                            ]
+                        }
+                    ];
+
+                    if (staffRoleId && /^\d{17,20}$/.test(staffRoleId.trim())) {
+                        permissionOverwrites.push({
+                            id: staffRoleId.trim(),
+                            type: OverwriteType.Role,
+                            deny: [
+                                PermissionFlagsBits.SendMessages,
+                                PermissionFlagsBits.ManageChannels,
+                                PermissionFlagsBits.ManageMessages
+                            ]
+                        });
+                    }
+
+                    if (ownerId && /^\d{17,20}$/.test(ownerId.trim()) && ownerId.trim() !== interaction.user.id) {
+                        permissionOverwrites.push({
+                            id: ownerId.trim(),
+                            type: OverwriteType.Member,
+                            allow: [
+                                PermissionFlagsBits.ViewChannel,
+                                PermissionFlagsBits.SendMessages,
+                                PermissionFlagsBits.ManageChannels,
+                                PermissionFlagsBits.ManageMessages,
+                                PermissionFlagsBits.AttachFiles,
+                                PermissionFlagsBits.EmbedLinks,
+                                PermissionFlagsBits.ReadMessageHistory
+                            ]
+                        });
+                    }
+
+                    targetChannel = await interaction.guild.channels.create({
+                        name: channelName,
+                        type: ChannelType.GuildText,
+                        parent: target.id,
+                        permissionOverwrites
+                    });
+                    isDifferentChannel = true;
+                }
+            }
+        } catch (err) {
+            console.error('[LỖI STOCK_ID]:', err);
+        }
+    }
+    return { targetChannel, isDifferentChannel };
 }

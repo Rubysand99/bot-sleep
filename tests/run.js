@@ -370,38 +370,43 @@ const msgFor = (channel, authorId, content, member) => {
         await reportDeliveryProblem({ client: { users: { fetch: async () => { throw new Error('mạng'); } } }, channel: { send: async () => { throw new Error('thiếu quyền'); } }, ticket, stage: 'Không được ném lỗi' });
     });
 
-    await test('/dang_anh: như /stock (tạo kênh theo giá, nút Buy, lưu kho) nhưng ảnh listing và không có Note', async () => {
+    await test('/dang_anh: chỉ ảnh + giá; tạo kênh theo giá, nút Buy, lưu kho, không Note', async () => {
         const { ChannelType } = require('discord.js');
         registry.set(STOCK_CAT, { id: STOCK_CAT, name: 'Stock', type: ChannelType.GuildCategory, guildId: 'G' });
-        const listingRenderer = require(path.join(root, 'utils/listingRenderer'));
-        const realRender = listingRenderer.renderListing;
-        const args = [];
-        listingRenderer.renderListing = async (d) => { args.push(d); return Buffer.from('png'); };
+        const cardRenderer = require(path.join(root, 'utils/cardRenderer'));
+        const realFetch = cardRenderer.fetchBuffer;
+        cardRenderer.fetchBuffer = async () => Buffer.from('png');
         const before = guild.channels.created.length;
+        const mk = (img) => ({
+            isChatInputCommand: () => true, commandName: 'dang_anh', user: { id: OWNER, bot: false }, member: makeMember(OWNER), client, guild, guildId: guild.id,
+            channelId: 'CUR', channel: makeChannel('lenh'), replies: [], edits: [], deferred: false,
+            options: { getString: (k) => (k === 'price' ? '150k' : null), getAttachment: () => img },
+            async reply(x) { this.replies.push(x); }, async deferReply() { this.deferred = true; },
+            async editReply(x) { this.edits.push(x); return { id: 'M1', channelId: 'CUR' }; }, async followUp(x) { this.replies.push(x); }
+        });
         try {
-            const vals = { username: 'listacc', price: '150k', capes: '<:Pan:111111111111111111> <:Pan:111111111111111111>' };
-            const it = {
-                isChatInputCommand: () => true, commandName: 'dang_anh', user: { id: OWNER, bot: false }, member: makeMember(OWNER), client, guild, guildId: guild.id,
-                channelId: 'CUR', channel: makeChannel('lenh'), replies: [], edits: [], deferred: false,
-                options: { getString: (k) => vals[k] ?? null },
-                async reply(x) { this.replies.push(x); }, async deferReply() { this.deferred = true; }, async editReply(x) { this.edits.push(x); }, async followUp(x) { this.replies.push(x); }
-            };
+            const bad = mk({ url: 'http://x/a.txt', contentType: 'text/plain' });
+            await index.handleInteraction(bad);
+            assert.ok(JSON.stringify(bad.replies).includes('phải là ảnh'));
+            assert.equal(guild.channels.created.length, before);
+
+            const it = mk({ url: 'http://x/a.png', contentType: 'image/png' });
             await index.handleInteraction(it);
-            assert.equal(guild.channels.created.length, before + 1, 'phải tạo 1 kênh mới');
+            assert.equal(guild.channels.created.length, before + 1, 'phải tạo 1 kênh mới ' + JSON.stringify(it.edits) + JSON.stringify(it.replies));
             const { ch, opts } = guild.channels.created.at(-1);
-            assert.equal(opts.name, '✅・150k・1-cape');   // cùng cách đặt tên với /stock
+            assert.equal(opts.name, '✅・150k・lien-quan');
             assert.equal(opts.parent, STOCK_CAT);
-            assert.deepEqual(args[0], { username: 'listacc', price: '150k', capes: '<:Pan:111111111111111111>' });
             const posted = ch.sent.at(-1);
             const json = JSON.stringify(posted.embeds[0].toJSON());
-            assert.ok(json.includes('Seller'), 'embed vẫn có dòng Seller');
+            assert.ok(json.includes('Seller') && json.includes('150k'), 'có Seller và giá');
             assert.ok(!json.includes('Note'), 'không có Note');
-            assert.ok(JSON.stringify(posted.components).includes('buy_acc_listacc'), 'có nút Buy');
+            assert.ok(/buy_acc_lq[0-9a-f]{6}/.test(JSON.stringify(posted.components)), 'có nút Buy');
             assert.equal(posted.components[0].components.length, 2, '2 nút như /stock');
-            const acc = await db.getAccount('listacc');
+            const key = JSON.stringify(posted.components).match(/buy_acc_(lq[0-9a-f]{6})/)[1];
+            const acc = await db.getAccount(key);
             assert.equal(acc.status, 'AVAILABLE'); assert.equal(acc.price, '150k');
             assert.ok(acc.cardMessageId, 'lưu id tin card để cập nhật SOLD sau này');
-        } finally { listingRenderer.renderListing = realRender; }
+        } finally { cardRenderer.fetchBuffer = realFetch; }
     });
 
     await test('.setqr: Owner cài / xem VietQR hộ người khác, người thường bị từ chối, sai cú pháp báo rõ', async () => {
