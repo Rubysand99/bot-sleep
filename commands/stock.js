@@ -18,6 +18,7 @@ const { buildCardRow } = require('../utils/cardButtons');
 const emojis = require('../utils/emojis');
 const { checkStaffOrOwner } = require('../utils/permissions');
 const { cfg } = require('../utils/runtime');
+const { buildStockNote } = require('../utils/stockNote');
 
 function countCapes(capesText) {
     if (!capesText) return 0;
@@ -145,8 +146,9 @@ module.exports = {
             });
 
             // Gói card trong Embed và thêm dòng Seller
+            const stockNote = buildStockNote({ guild: interaction.guild });
             const embed = new EmbedBuilder()
-                .setDescription(`${emojis.text('info', interaction.guildId)} **Seller:** <@${sellerId}>`)
+                .setDescription(`${emojis.text('info', interaction.guildId)} **Seller:** <@${sellerId}>` + (stockNote ? `\n\n${stockNote}` : ''))
                 .setImage('attachment://card.png')
                 .setColor('#2b2d31');
 

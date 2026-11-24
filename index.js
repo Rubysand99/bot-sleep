@@ -587,31 +587,7 @@ const buildResendRow = (username) => new ActionRowBuilder().addComponents(
         .setLabel('Gửi lại thông tin').setEmoji('📩').setStyle(ButtonStyle.Primary)
 );
 
-// Khối Note của bill. Kênh và emoji đều đặt bằng biến (mỗi server một khác), dòng nào chưa đặt kênh thì bỏ qua.
-//  Kênh:  BILL_KENH_DIEUKHOAN, BILL_KENH_DOITHONGTIN, BILL_KENH_2FA (hoặc KENH_2FA / `/config`), BILL_KENH_LUUY
-//         (chưa đặt thì dùng kênh mặc định trong utils/constants.js > DEFAULT_CHANNELS, nếu kênh đó nằm trong server)
-//  Emoji: BILL_EMOJI_SET, BILL_EMOJI_NOTE, BILL_EMOJI_SETTINGS, BILL_EMOJI_KEY, BILL_EMOJI_WARNING (mặc định là emoji thường)
-//  Khác:  BILL_NOTE (dòng ghi chú chung), BILL_FOOTER (dòng nhỏ cuối Note, mặc định "<username seller> • AutoBuy Bot")
 const billEmoji = (name, def) => fromEnvTrim(`BILL_EMOJI_${name}`) || def;
-function buildBillNote({ guild, sellerName }) {
-    const E = {
-        note: billEmoji('NOTE', '📝'), settings: billEmoji('SETTINGS', '⚙️'),
-        key: billEmoji('KEY', '🔑'), warning: billEmoji('WARNING', '⚠️')
-    };
-    const chId = (envName, ...alsoCfg) => cfg(envName, guild) || alsoCfg.map(n => cfg(n, guild)).find(Boolean) || '';
-    const lines = [`--- ${E.note} Note ---`];
-    const rows = [
-        ['📜', 'Điều khoản', chId('BILL_KENH_DIEUKHOAN')],
-        [E.settings, 'Cách đổi thông tin', chId('BILL_KENH_DOITHONGTIN')],
-        [E.key, 'Nếu có 2fa', chId('BILL_KENH_2FA', 'KENH_2FA')],
-        [E.warning, 'Lưu ý', chId('BILL_KENH_LUUY')]
-    ];
-    for (const [icon, label, id] of rows) if (id && /^\d{17,20}$/.test(id)) lines.push(`${icon} **${label}:** <#${id}>`);
-    const extra = fromEnvTrim('BILL_NOTE');
-    if (extra) lines.push('', extra);
-    lines.push(`-# ${fromEnvTrim('BILL_FOOTER') || `${sellerName || 'shop'} • AutoBuy Bot`}`);
-    return lines.join('\n');
-}
 function fromEnvTrim(name) { const v = process.env[name]; return v && v.trim() ? v.trim() : ''; }
 
 // ==========================================
@@ -745,10 +721,6 @@ async function handleConfirm(interaction) {
                 const targetUsername = account?.username || ticket.username || username;
                 const targetPrice = account?.price || ticket.price || 'N/A';
                 const billText = `(${buyerMention}) Đã Mua tài khoản ( ${targetUsername} ) với giá ( ${targetPrice} )`;
-                const noteText = buildBillNote({
-                    guild: interaction.guild,
-                    sellerName: sellerUser?.username
-                });
 
                 let billAttachment = null;
                 if (account) {
@@ -766,7 +738,7 @@ async function handleConfirm(interaction) {
                 const unix = Math.floor(Date.now() / 1000);
                 const billEmbed = new EmbedBuilder()
                     .setColor('#2b2d31')
-                    .setDescription(`## ${billEmoji('SET', '🧾')} BILL ĐƠN HÀNG ${billEmoji('SET', '🧾')}\n\n${noteText}`)
+                    .setDescription(`## ${billEmoji('SET', '🧾')} BILL ĐƠN HÀNG ${billEmoji('SET', '🧾')}`)
                     .addFields(
                         { name: '👤 Buyer', value: `${buyerMention}\n${buyerTag}`, inline: true },
                         { name: '🧑‍💼 Seller', value: sellerId ? `<@${sellerId}>\n${sellerUser?.username ? `@${sellerUser.username}` : ''}`.trim() : 'N/A', inline: true },
@@ -1740,5 +1712,5 @@ if (require.main === module) {
 
 module.exports = {
     client, handleInteraction, handleMessage, handleCancelTicket, closeTicketChannel,
-    runVouchReminders, reconcileOnStartup, logGuildDiagnostics, scanLegitChannels, resendCredentials, toSoldName, toPendingName, toAvailableName, buildBillNote
+    runVouchReminders, reconcileOnStartup, logGuildDiagnostics, scanLegitChannels, resendCredentials, toSoldName, toPendingName, toAvailableName
 };

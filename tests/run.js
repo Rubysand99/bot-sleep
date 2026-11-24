@@ -28,6 +28,7 @@ const { Collection } = require('discord.js');
 const runtime = require(path.join(root, 'utils/runtime'));
 const legitUtil = require(path.join(root, 'utils/legit'));
 const C = require(path.join(root, 'utils/constants'));
+const { buildStockNote } = require(path.join(root, 'utils/stockNote'));
 
 const results = [];
 async function test(name, fn) {
@@ -792,11 +793,11 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal(await db.getTicket(created.ch.id), null);
         await index.handleInteraction(mkCmd('staff', 'remove', { opts: { user: target } }));
     });
-    await test('Note của bill: không còn dòng Card, 4 kênh + kênh bill mặc định chỉ nhận khi nằm trong server', async () => {
+    await test('Note (embed stock): không có dòng Card, 4 kênh + kênh bill mặc định chỉ nhận khi nằm trong server', async () => {
         const IDS = { dk: '1574315404644454410', dtt: '1574309755428675634', fa: '1574313118517956618', ly: '1574313882846101524', bill: '1574382993567522826' };
         const has = (ids) => ({ id: 'GN', channels: { cache: new Map(ids.map(i => [i, {}])) } });
         const full = has(Object.values(IDS));
-        const note = index.buildBillNote({ guild: full, sellerName: 'seller' });
+        const note = buildStockNote({ guild: full });
         assert.ok(!/Card/i.test(note), 'không còn dòng Card');
         assert.ok(note.includes(`**Điều khoản:** <#${IDS.dk}>`));
         assert.ok(note.includes(`**Cách đổi thông tin:** <#${IDS.dtt}>`));
@@ -805,11 +806,11 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal(runtime.cfg('BILL_ID', full), IDS.bill, 'kênh bill mặc định');
         const other = has(['999999999999999999']);
         assert.equal(runtime.cfg('BILL_ID', other), '', 'server không có kênh đó thì không mượn');
-        const bare = index.buildBillNote({ guild: other, sellerName: 'seller' });
-        assert.ok(!bare.includes('<#'), 'server khác không hiện kênh của server này');
+        const bare = buildStockNote({ guild: other });
+        assert.equal(bare, '', 'server khác không hiện kênh của server này');
         // biến môi trường luôn thắng mặc định
         process.env.BILL_KENH_LUUY = '123456789012345678';
-        try { assert.ok(index.buildBillNote({ guild: full }).includes('<#123456789012345678>')); } finally { delete process.env.BILL_KENH_LUUY; }
+        try { assert.ok(buildStockNote({ guild: full }).includes('<#123456789012345678>')); } finally { delete process.env.BILL_KENH_LUUY; }
     });
     await test('/config: đặt / xóa kênh ghi đè biến môi trường, chỉ Owner; legit_count đổi tên kênh', async () => {
         const NEW_BILL = '666666666666666666';
