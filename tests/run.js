@@ -756,6 +756,20 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal(u.dms.length, 3);
         assert.ok(!col.docs.some(r => r._id === 'remtest'));
     });
+    await test('nhắc vouch acc /dang_anh (inChannel): nhắc trong kênh ticket, KHÔNG DM; kênh đã xóa thì bỏ lịch', async () => {
+        const u = makeUser('800000000000000019');
+        const tk = makeChannel('ticket-lq');
+        await db.scheduleVouchReminder({ channelId: tk.id, buyerId: u.id, sellerId: SELLER, username: 'lqx', inChannel: true }, -1000);
+        await index.runVouchReminders();
+        assert.equal(u.dms.length, 0, 'không được DM');
+        assert.equal(tk.sent.length, 1);
+        assert.ok(String(tk.sent[0].content).includes(`<@${u.id}>`) && String(tk.sent[0].content).includes('+1 legit'));
+        const col = FakeMongoClient.last.db('autobuy').collection('reminders');
+        await db.scheduleVouchReminder({ channelId: 'kenh-da-xoa', buyerId: u.id, sellerId: SELLER, username: 'lqy', inChannel: true }, -1000);
+        await index.runVouchReminders();
+        assert.equal(u.dms.length, 0);
+        assert.ok(!col.docs.some(r => r._id === 'kenh-da-xoa'));
+    });
     await test('/done bị chặn nếu ticket đã Confirm (tránh cộng trùng), dùng được ở kênh khác', async () => {
         const done = require(path.join(root, 'commands/done'));
         const buyer = users.get('800000000000000001');
