@@ -377,10 +377,10 @@ async function getTopCustomers(limit = 10) {
 // ==========================================
 // 6. Nhắc vouch (lưu trong DB, không mất khi restart)
 // ==========================================
-async function scheduleVouchReminder({ channelId, buyerId, sellerId, username, inChannel = false }, delayMs) {
+async function scheduleVouchReminder({ channelId, buyerId, sellerId, username }, delayMs) {
     await col('reminders').replaceOne(
         { _id: String(channelId) },
-        { buyerId: String(buyerId), sellerId: String(sellerId || ''), username, inChannel: !!inChannel, count: 0, nextAt: Date.now() + delayMs },
+        { buyerId: String(buyerId), sellerId: String(sellerId || ''), username, count: 0, nextAt: Date.now() + delayMs },
         { upsert: true }
     );
 }

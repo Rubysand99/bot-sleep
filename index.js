@@ -270,15 +270,10 @@ async function runVouchRemindersForCurrentGuild() {
             if (!(await db.claimReminder(r._id, r.nextAt))) continue;   // instance khác đã lấy lịch này
             const template = `+1 legit <@${r.sellerId || process.env.OWNER_ID}> mfa`;
             const content = `👋 <@${r.buyerId}> bạn đừng quên vouch cho **${profile.brand()}** nhé!\n\n**Mẫu copy:**\n\`\`\`text\n${template}\n\`\`\``;
-            if (r.inChannel) {
-                // Acc đăng bằng /dang_anh (Liên Quân): nhắc ngay trong kênh ticket, không DM. Kênh đã xóa thì bỏ lịch nhắc.
-                const ch = await client.channels.fetch(r._id).catch(() => null);
-                if (!ch || !ch.send) { await db.deleteReminder(r._id); continue; }
-                await ch.send({ content, allowedMentions: { users: [r.buyerId] } }).catch(() => null);
-            } else {
-                const user = await client.users.fetch(r.buyerId).catch(() => null);
-                if (user) await user.send({ content }).catch(() => null);
-            }
+            // Nhắc ngay trong kênh ticket, không DM. Kênh đã xóa thì bỏ lịch nhắc.
+            const ch = await client.channels.fetch(r._id).catch(() => null);
+            if (!ch || !ch.send) { await db.deleteReminder(r._id); continue; }
+            await ch.send({ content, allowedMentions: { users: [r.buyerId] } }).catch(() => null);
             const sent = (r.count || 0) + 1;
             if (sent >= C.VOUCH_REMINDER_DELAYS_MIN.length) {
                 await db.deleteReminder(r._id);      // đã nhắc đủ số lần
@@ -823,8 +818,7 @@ async function handleConfirm(interaction) {
             channelId: interaction.channelId,
             buyerId,
             sellerId: ticket.sellerId || account?.sellerId || ownerId,
-            username,
-            inChannel: account?.game === 'lienquan'
+            username
         }, C.VOUCH_REMINDER_DELAYS_MIN[0] * 60_000).catch(err => console.error('[Lỗi lưu nhắc vouch]:', err.message));
     }
 }

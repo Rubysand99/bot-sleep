@@ -746,6 +746,7 @@ const msgFor = (channel, authorId, content, member) => {
     console.log('\n[9] Nhắc vouch (lưu DB, tối đa 3 lần) và /done');
     await test('nhắc vouch: gửi đúng 3 lần rồi dừng, không spam', async () => {
         const u = makeUser('800000000000000009');
+        const remCh = makeChannel('ticket-rem', { id: 'remtest' });
         await db.scheduleVouchReminder({ channelId: 'remtest', buyerId: u.id, sellerId: SELLER, username: 'x' }, -1000);
         const col = FakeMongoClient.last.db('autobuy').collection('reminders');
         for (let i = 0; i < 6; i++) {
@@ -753,19 +754,20 @@ const msgFor = (channel, authorId, content, member) => {
             const d = col.docs.find(r => r._id === 'remtest');
             if (d) d.nextAt = 0;   // giả lập thời gian trôi qua
         }
-        assert.equal(u.dms.length, 3);
+        assert.equal(remCh.sent.length, 3);
+        assert.equal(u.dms.length, 0);
         assert.ok(!col.docs.some(r => r._id === 'remtest'));
     });
-    await test('nhắc vouch acc /dang_anh (inChannel): nhắc trong kênh ticket, KHÔNG DM; kênh đã xóa thì bỏ lịch', async () => {
+    await test('nhắc vouch: nhắc trong kênh ticket, KHÔNG DM; kênh đã xóa thì bỏ lịch', async () => {
         const u = makeUser('800000000000000019');
         const tk = makeChannel('ticket-lq');
-        await db.scheduleVouchReminder({ channelId: tk.id, buyerId: u.id, sellerId: SELLER, username: 'lqx', inChannel: true }, -1000);
+        await db.scheduleVouchReminder({ channelId: tk.id, buyerId: u.id, sellerId: SELLER, username: 'lqx' }, -1000);
         await index.runVouchReminders();
         assert.equal(u.dms.length, 0, 'không được DM');
         assert.equal(tk.sent.length, 1);
         assert.ok(String(tk.sent[0].content).includes(`<@${u.id}>`) && String(tk.sent[0].content).includes('+1 legit'));
         const col = FakeMongoClient.last.db('autobuy').collection('reminders');
-        await db.scheduleVouchReminder({ channelId: 'kenh-da-xoa', buyerId: u.id, sellerId: SELLER, username: 'lqy', inChannel: true }, -1000);
+        await db.scheduleVouchReminder({ channelId: 'kenh-da-xoa', buyerId: u.id, sellerId: SELLER, username: 'lqy' }, -1000);
         await index.runVouchReminders();
         assert.equal(u.dms.length, 0);
         assert.ok(!col.docs.some(r => r._id === 'kenh-da-xoa'));
@@ -952,9 +954,10 @@ const msgFor = (channel, authorId, content, member) => {
     });
     await test('nhắc vouch: 2 instance chạy cùng lúc chỉ nhắc 1 lần', async () => {
         const u = makeUser('800000000000000030');
+        const dupCh = makeChannel('ticket-dup', { id: 'dup1' });
         await db.scheduleVouchReminder({ channelId: 'dup1', buyerId: u.id, sellerId: SELLER, username: 'x' }, -1000);
         await Promise.all([index.runVouchReminders(), index.runVouchReminders()]);
-        assert.equal(u.dms.length, 1);
+        assert.equal(dupCh.sent.length, 1);
     });
 
     console.log('\n[11] Quản lý Staff và kênh (Owner)');
