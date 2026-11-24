@@ -11,14 +11,14 @@ let db = null;                // database CHÍNH: chứa `settings` (cấu hình
 let baseName = 'autobuy';
 
 // ===== Tách dữ liệu theo server =====
-// Mỗi server có database riêng cho: accounts, tickets, staff_qr, customers, reminders.
+// Mỗi server có database riêng cho: accounts, tickets, staff_qr, customers, reminders, qr_requests.
 //  - Server chính (MAIN_GUILD_ID) dùng luôn database cũ => dữ liệu cũ tự thuộc về server này, không cần chuyển dữ liệu.
 //  - Server khác dùng database `<tên db>_<guildId>`, tự tạo khi cần.
 //  - `settings` (cấu hình, owner/staff, bộ đếm legit...) vẫn dùng chung vì khóa của chúng đã có ID server.
 // Server hiện tại được truyền ngầm qua AsyncLocalStorage: bọc xử lý bằng withGuild(guildId, fn).
 // Không có server trong ngữ cảnh (vd script, test) => dùng dữ liệu của server chính.
 const MAIN_GUILD_ID = String(process.env.MAIN_GUILD_ID || '1462789815333289986').trim();
-const GUILD_COLLECTIONS = new Set(['accounts', 'tickets', 'staff_qr', 'customers', 'reminders']);
+const GUILD_COLLECTIONS = new Set(['accounts', 'tickets', 'staff_qr', 'customers', 'reminders', 'qr_requests']);
 const als = new AsyncLocalStorage();
 const guildStores = new Map();        // guildId -> Promise<{ db, ticketIds }>
 
@@ -389,6 +389,38 @@ async function getDueReminders(nowMs = Date.now(), limit = 50) {
     return col('reminders').find({ nextAt: { $lte: nowMs } }).limit(limit).toArray();
 }
 
+// ==========================================
+// Yêu cầu cài thông tin ngân hàng (/set_qr của người thường): chờ Owner xác nhận, chuyển lần lượt từng Owner
+// status: pending | approved | rejected | superseded. sentIdx = vị trí Owner đã gửi gần nhất (-1 = chưa gửi).
+// nextSendAt: thời điểm được gửi cho Owner kế tiếp (Number.MAX_SAFE_INTEGER = đã gửi hết, chỉ còn chờ).
+// ==========================================
+async function createQrRequest(doc) {
+    await col('qr_requests').updateOne({ _id: doc._id }, { $set: { status: 'pending', sentIdx: -1, nextSendAt: 0, msgs: [], createdAt: Date.now(), ...doc } }, { upsert: true });
+    return col('qr_requests').findOne({ _id: doc._id });
+}
+const getQrRequest = (id) => col('qr_requests').findOne({ _id: String(id) });
+const getPendingQrRequestsByUser = (userId) => col('qr_requests').find({ userId: String(userId), status: 'pending' }).toArray();
+const getDueQrRequests = (nowMs = Date.now(), limit = 50) => col('qr_requests').find({ status: 'pending', nextSendAt: { $lte: nowMs } }).limit(limit).toArray();
+
+// Giành lượt gửi cho Owner kế tiếp (chống 2 instance cùng gửi). Trả về yêu cầu sau khi cập nhật, hoặc null.
+async function claimQrRequestStep(id, expectedIdx, nextSendAt) {
+    return col('qr_requests').findOneAndUpdate(
+        { _id: String(id), status: 'pending', sentIdx: expectedIdx },
+        { $set: { sentIdx: expectedIdx + 1, nextSendAt } },
+        { returnDocument: 'after' }
+    );
+}
+const setQrRequestMessages = (id, msgs) => col('qr_requests').updateOne({ _id: String(id) }, { $set: { msgs } });
+
+// Chốt yêu cầu đúng 1 lần (Owner nào bấm trước thì thắng). Trả về yêu cầu nếu vừa chốt, null nếu đã được xử lý trước đó.
+async function resolveQrRequest(id, status, byId) {
+    return col('qr_requests').findOneAndUpdate(
+        { _id: String(id), status: 'pending' },
+        { $set: { status, resolvedBy: byId ? String(byId) : null, resolvedAt: Date.now() } },
+        { returnDocument: 'after' }
+    );
+}
+
 // Giành quyền xử lý 1 lịch nhắc (chống 2 instance cùng nhắc 1 lần). Trả về null nếu instance khác đã lấy.
 async function claimReminder(id, expectedNextAt, lockMs = 120_000) {
     return col('reminders').findOneAndUpdate(
@@ -419,5 +451,6 @@ module.exports = {
     getTicket, isTicketChannel, saveTicket, updateTicket, deleteTicket, listTickets, getTicketByUsername, lockTicketConfirm, markTicketRevenue, countOpenTicketsByBuyer,
     getSetting, saveSetting, getSettingsWithPrefix, nextLegitNumber,
     recordCustomerPurchase, setCustomerTotal, getCustomer, getAllCustomers, getTopCustomers,
-    scheduleVouchReminder, getDueReminders, claimReminder, advanceReminder, deleteReminder, clearRemindersForBuyer
+    scheduleVouchReminder, getDueReminders, claimReminder, advanceReminder, deleteReminder, clearRemindersForBuyer,
+    createQrRequest, getQrRequest, getPendingQrRequestsByUser, getDueQrRequests, claimQrRequestStep, setQrRequestMessages, resolveQrRequest
 };

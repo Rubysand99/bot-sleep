@@ -203,8 +203,8 @@ const msgFor = (channel, authorId, content, member) => {
             const it = { member: makeMember(uid, [STAFF_ROLE]), user: { id: uid }, replies: [],
                 options: { getString: (k) => ({ bank_name: bank, account_number: acc, bank_type: name }[k]) },
                 async reply(x) { this.replies.push(x); } };
-            await setQr.execute(it);
-            assert.ok(JSON.stringify(it.replies).includes('thành công'));
+            // Người thường /set_qr phải chờ Owner xác nhận (xem test riêng); ở đây chỉ kiểm tra lưu / dùng QR theo từng người
+            await db.saveStaffQR(uid, { bankName: require(path.join(root, 'utils/vietqr')).resolveBankCode(bank), accountNumber: acc, bankType: name });
         };
         await run(S1, 'MB', '1111111111', 'SELLER ONE');
         await run(S2, 'VCB', '2222222222', 'SELLER TWO');
@@ -430,6 +430,106 @@ const msgFor = (channel, authorId, content, member) => {
         const bad = msgFor(ch, OWNER, '.setqr <@800000000000000051> MB 12 X');
         await index.handleMessage(bad);
         assert.ok(JSON.stringify(bad.replies).includes('không hợp lệ'));
+    });
+
+    await test('/set_qr người thường: gửi Owner xác nhận, 5 phút chưa xác nhận thì sang Owner kế, hết Owner thì chờ; xác nhận mới lưu', async () => {
+        const qrReq = require(path.join(root, 'utils/qrRequests'));
+        const OWNER2 = '111111111111111112', OWNER3 = '111111111111111113', REQ = '800000000000000070';
+        const dmMsgs = new Map();   // ownerId -> tin DM đã gửi (giả lập)
+        const mkOwner = (id, opts) => {
+            const u = makeUser(id, opts);
+            u.send = async (x) => {
+                if (u.dmFails) throw new Error('Cannot send messages to this user');
+                u.dms.push(x);
+                const msg = { id: nextId(), channelId: 'DM' + id, edits: [], async edit(p) { msg.edits.push(p); } };
+                dmMsgs.set(id, msg);
+                registry.set('DM' + id, { id: 'DM' + id, messages: { fetch: async () => msg } });
+                return msg;
+            };
+            return u;
+        };
+        const o1 = mkOwner(OWNER), o2 = mkOwner(OWNER2), o3 = mkOwner(OWNER3);
+        const requester = makeUser(REQ);
+        runtime.setExtraOwners('G', [OWNER2, OWNER3]);
+        const realNow = Date.now;
+        try {
+            const vals = { bank_name: 'MB', account_number: '0123 456 789', bank_type: 'nguyen van a' };
+            const it = {
+                isChatInputCommand: () => true, commandName: 'set_qr', user: { id: REQ, bot: false }, member: makeMember(REQ), client, guild, guildId: guild.id,
+                channelId: 'CUR', channel: makeChannel('lenh'), replies: [], edits: [],
+                options: { getString: (k) => vals[k] ?? null },
+                async reply(x) { this.replies.push(x); }, async deferReply() {}, async editReply(x) { this.edits.push(x); return {}; }, async followUp(x) { this.replies.push(x); }
+            };
+            await index.handleInteraction(it);   // người thường dùng được (không cần Staff)
+            assert.ok(JSON.stringify(it.edits).includes('Đã gửi yêu cầu cho Owner xác nhận'));
+            assert.equal(await db.getStaffQR(REQ), null, 'chưa xác nhận thì chưa lưu');
+            assert.equal(o1.dms.length, 1, 'gửi Owner đầu tiên'); assert.equal(o2.dms.length, 0);
+            const emb = JSON.stringify(o1.dms[0].embeds[0].toJSON());
+            assert.ok(emb.includes('0123456789') && emb.includes('NGUYEN VAN A'));
+            const customIds = o1.dms[0].components[0].components.map(c => c.toJSON().custom_id);
+            assert.ok(customIds[0].startsWith('qrreq_ok_G_') && customIds[1].startsWith('qrreq_no_G_'));
+
+            await qrReq.advanceDueQrRequests(client, guild);
+            assert.equal(o2.dms.length, 0, 'chưa đủ 5 phút thì chưa chuyển');
+            Date.now = () => realNow() + 6 * 60_000;
+            await qrReq.advanceDueQrRequests(client, guild);
+            assert.equal(o2.dms.length, 1, 'quá 5 phút: chuyển Owner kế tiếp'); assert.equal(o3.dms.length, 0);
+            Date.now = () => realNow() + 12 * 60_000;
+            await qrReq.advanceDueQrRequests(client, guild);
+            assert.equal(o3.dms.length, 1, 'tiếp 5 phút: Owner cuối');
+            Date.now = () => realNow() + 60 * 60_000;
+            await qrReq.advanceDueQrRequests(client, guild);
+            assert.equal(o1.dms.length + o2.dms.length + o3.dms.length, 3, 'gửi hết Owner rồi thì chỉ chờ, không gửi lại');
+            Date.now = realNow;
+
+            const click = (userId, cid) => ({
+                isChatInputCommand: () => false, isModalSubmit: () => false, isButton: () => true,
+                customId: cid, user: { id: userId }, guildId: null, guild: null, replies: [],
+                async reply(x) { this.replies.push(x); }
+            });
+            const okId = customIds[0];
+            const stranger = click('800000000000000099', okId);
+            await index.handleInteraction(stranger);
+            assert.ok(JSON.stringify(stranger.replies).includes('Chỉ Owner'));
+            assert.equal(await db.getStaffQR(REQ), null);
+
+            const approve = click(OWNER3, okId);   // Owner thứ 3 xác nhận (đã nhận được ở bước chuyển tiếp)
+            await index.handleInteraction(approve);
+            const saved = await db.getStaffQR(REQ);
+            assert.equal(saved.accountNumber, '0123456789'); assert.equal(saved.bankType, 'NGUYEN VAN A'); assert.equal(saved.bankName, 'MB');
+            for (const msg of dmMsgs.values()) assert.deepEqual(msg.edits.at(-1).components, [], 'mọi tin gửi Owner được bỏ nút');
+            assert.ok(requester.dms.some(d => String(d.content).includes('đã xác nhận')), 'báo lại cho người yêu cầu');
+
+            const again = click(OWNER, customIds[1]);
+            await index.handleInteraction(again);
+            assert.ok(JSON.stringify(again.replies).includes('đã được xử lý'), 'bấm lần 2 / Owner khác bấm sau không ghi đè');
+            assert.equal((await db.getStaffQR(REQ)).accountNumber, '0123456789');
+
+            // Owner đầu tắt DM: bỏ qua ngay, sang Owner kế
+            o1.dmFails = true; o1.dms.length = 0; o2.dms.length = 0;
+            vals.account_number = '0987654321';
+            const it2 = { ...it, edits: [], replies: [] };
+            await index.handleInteraction(it2);
+            assert.equal(o2.dms.length, 1, 'Owner 1 tắt DM: gửi ngay cho Owner 2');
+            // Gửi yêu cầu mới thì yêu cầu cũ còn chờ bị thay thế (nút cũ không dùng được nữa)
+            const oldId = o2.dms[0].components[0].components[0].toJSON().custom_id;
+            o1.dmFails = false;
+            vals.account_number = '0555555555';
+            await index.handleInteraction({ ...it, edits: [], replies: [] });
+            const stale = click(OWNER2, oldId);
+            await index.handleInteraction(stale);
+            assert.ok(JSON.stringify(stale.replies).includes('đã được xử lý'), 'yêu cầu cũ đã bị thay thế');
+
+            // Owner tự dùng /set_qr: có hiệu lực ngay, không cần xác nhận
+            const itOwner = { ...it, user: { id: OWNER }, member: makeMember(OWNER), replies: [], edits: [] };
+            vals.account_number = '0111222333';
+            await index.handleInteraction(itOwner);
+            assert.equal((await db.getStaffQR(OWNER)).accountNumber, '0111222333');
+            vals.account_number = 'abc';
+            const bad = { ...it, replies: [], edits: [] };
+            await index.handleInteraction(bad);
+            assert.ok(JSON.stringify(bad.replies).includes('không hợp lệ'));
+        } finally { Date.now = realNow; runtime.setExtraOwners('G', []); }
     });
 
     console.log('\n[7] Close / hủy đơn / dọn dẹp');

@@ -37,7 +37,7 @@ function buildHelpEmbed(member) {
         const slash = pick([
             ['autobuy', '`/add_acc`: mở form dán thông tin tài khoản vào kho (bot mã hóa mật khẩu).'],
             ['autobuy', '`/stock acc username price`: đăng card bán kèm nút BUY (tùy chọn: capes, rank, statshpx, statsdonut).'],
-            ['autobuy', '`/set_qr bank_name account_number bank_type`: cài ngân hàng để bot tạo VietQR.'],
+            ['autobuy', '`/set_qr bank_name account_number bank_type`: cài ngân hàng để bot tạo VietQR (người thường: Owner xác nhận qua DM mới có hiệu lực).'],
             ['autobuy', '`/restock`: đăng danh sách các kênh đang còn hàng.'],
             ['bxh', '`/done customer amount`: ghi doanh thu thủ công' + (profile.has('autobuy') ? ' (không dùng nếu đã Confirm).' : '.')],
             ['bxh', '`/leaderboard`: bảng xếp hạng khách mua nhiều nhất.'],

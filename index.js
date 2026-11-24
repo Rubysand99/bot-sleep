@@ -43,6 +43,7 @@ const { scheduleLegitRename, isLegitMessage } = require('./utils/legit');
 const { log, errInfo, hint, trace } = require('./utils/logger');
 const { reportDeliveryProblem, isDmClosed } = require('./utils/deliveryAlert');
 const { parseSetQr } = require('./utils/prefixSetQr');
+const qrRequests = require('./utils/qrRequests');
 const milestones = require('./utils/milestones');
 const { diagnoseGuild, formatDiagnosis, resolveLegitChannel } = require('./utils/diagnostics');
 const { buildCategoryPicker, isCategoryPicker, handleCategoryPick, deleteChannel, parseChannelId } = require('./utils/channelManager');
@@ -979,7 +980,7 @@ async function handleClose(interaction) {
 // INTERACTION CREATE
 // ==========================================
 // Lệnh slash chỉ dành cho Owner/Staff
-const STAFF_RESTRICTED_COMMANDS = ['restock', 'leaderboard', 'set_qr', 'skin', 'dang_anh', 'done', 'stock', 'add_acc', 'sticky', 'taokenh', 'xoakenh'];
+const STAFF_RESTRICTED_COMMANDS = ['restock', 'leaderboard', 'skin', 'dang_anh', 'done', 'stock', 'add_acc', 'sticky', 'taokenh', 'xoakenh'];
 // Lệnh chỉ Owner dùng được
 const OWNER_ONLY_COMMANDS = ['staff', 'config', 'set_kenhsold', 'owner'];
 
@@ -1102,6 +1103,7 @@ async function handleInteractionInner(interaction) {
             if (!profile.has('autobuy') && (isPanelButton(customId) || /^(buy_acc_|ticket_(confirm|resend|close)_)/.test(customId))) return await featureOff(interaction);
             if (isPanelButton(customId)) return await handlePanelButton(interaction, client);
             if (customId.startsWith('buy_acc_')) return await handleBuy(interaction);
+            if (customId.startsWith(`${qrRequests.PREFIX}_`)) return await handleQrRequestButton(interaction);
             if (customId.startsWith('ticket_confirm_')) return await handleConfirm(interaction);
             if (customId.startsWith('ticket_resend_')) return await handleResend(interaction);
             if (customId.startsWith('ticket_close_')) return await handleClose(interaction);
@@ -1385,6 +1387,31 @@ async function handleSoldMessage(message) {
         if (m) setTimeout(() => m.delete().catch(() => null), 60_000);
     }
     return true;
+}
+
+// Owner bấm Xác nhận / Từ chối trong DM yêu cầu /set_qr. customId: qrreq_<ok|no>_<guildId>_<id> (DM không có guild nên guildId nằm trong customId)
+async function handleQrRequestButton(interaction) {
+    const [, action, guildId, id] = interaction.customId.split('_');
+    if (!guildId || !id || !profile.guildAllowed(guildId)) return;
+    return db.withGuild(guildId, async () => {
+        if (!isOwnerId(interaction.user.id, guildId)) {
+            return await interaction.reply({ content: '❌ Chỉ Owner mới được xác nhận yêu cầu này!', flags: EPHEMERAL });
+        }
+        const guild = client.guilds.cache.get(guildId) || { id: guildId };
+        const res = await qrRequests.decideQrRequest({ client, guild, id, approve: action === 'ok', byId: interaction.user.id });
+        if (!res.ok) {
+            return await interaction.reply({ content: 'ℹ️ Yêu cầu này đã được xử lý trước đó (hoặc đã bị thay bằng yêu cầu mới).', flags: EPHEMERAL });
+        }
+        // Tin của người bấm đã được cập nhật trong decideQrRequest; thông báo ngắn cho chắc
+        await interaction.reply({ content: action === 'ok' ? '✅ Đã xác nhận và lưu thông tin ngân hàng.' : '❌ Đã từ chối yêu cầu.', flags: EPHEMERAL }).catch(() => null);
+    });
+}
+
+// Quét mỗi phút: yêu cầu /set_qr quá 5 phút chưa ai xác nhận thì chuyển cho Owner kế tiếp
+async function runQrRequests() {
+    for (const gid of guildIdsToSweep()) {
+        await db.withGuild(gid, () => qrRequests.advanceDueQrRequests(client, client.guilds.cache.get(gid) || { id: gid })).catch(err => console.error('[Lỗi quét yêu cầu QR]:', gid, err.message));
+    }
 }
 
 // .setqr (chỉ Owner): lưu / xem thông tin ngân hàng VietQR giúp người khác, giống /set_qr
@@ -1765,6 +1792,7 @@ client.once(Events.ClientReady || 'ready', async () => {
     for (const g of client.guilds.cache.values()) await logGuildDiagnostics(g);
     if (profile.has('legit')) await scanLegitChannels().catch(err => console.error('[LỖI QUÉT LEGIT]:', err));
     if (profile.has('bxh')) await refreshLeaderboardMessage(client).catch(() => null);   // bảng xếp hạng luôn khớp dữ liệu sau mỗi lần khởi động
+    if (profile.has('autobuy')) setInterval(() => runQrRequests().catch(err => console.error('[Lỗi quét yêu cầu QR]:', err.message)), 60_000);
     if (profile.has('autobuy')) setInterval(() => runVouchReminders().catch(err => console.error('[Lỗi quét nhắc vouch]:', err.message)), 60_000);
 });
 
