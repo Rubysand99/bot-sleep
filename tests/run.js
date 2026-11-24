@@ -369,6 +369,40 @@ const msgFor = (channel, authorId, content, member) => {
         await reportDeliveryProblem({ client: { users: { fetch: async () => { throw new Error('mạng'); } } }, channel: { send: async () => { throw new Error('thiếu quyền'); } }, ticket, stage: 'Không được ném lỗi' });
     });
 
+    await test('/dang_anh: như /stock (tạo kênh theo giá, nút Buy, lưu kho) nhưng ảnh listing và không có Note', async () => {
+        const { ChannelType } = require('discord.js');
+        registry.set(STOCK_CAT, { id: STOCK_CAT, name: 'Stock', type: ChannelType.GuildCategory, guildId: 'G' });
+        const listingRenderer = require(path.join(root, 'utils/listingRenderer'));
+        const realRender = listingRenderer.renderListing;
+        const args = [];
+        listingRenderer.renderListing = async (d) => { args.push(d); return Buffer.from('png'); };
+        const before = guild.channels.created.length;
+        try {
+            const vals = { username: 'listacc', price: '150k', capes: '<:Pan:111111111111111111> <:Pan:111111111111111111>' };
+            const it = {
+                isChatInputCommand: () => true, commandName: 'dang_anh', user: { id: OWNER, bot: false }, member: makeMember(OWNER), client, guild, guildId: guild.id,
+                channelId: 'CUR', channel: makeChannel('lenh'), replies: [], edits: [], deferred: false,
+                options: { getString: (k) => vals[k] ?? null },
+                async reply(x) { this.replies.push(x); }, async deferReply() { this.deferred = true; }, async editReply(x) { this.edits.push(x); }, async followUp(x) { this.replies.push(x); }
+            };
+            await index.handleInteraction(it);
+            assert.equal(guild.channels.created.length, before + 1, 'phải tạo 1 kênh mới');
+            const { ch, opts } = guild.channels.created.at(-1);
+            assert.equal(opts.name, '✅・150k・1-cape');   // cùng cách đặt tên với /stock
+            assert.equal(opts.parent, STOCK_CAT);
+            assert.deepEqual(args[0], { username: 'listacc', price: '150k', capes: '<:Pan:111111111111111111>' });
+            const posted = ch.sent.at(-1);
+            const json = JSON.stringify(posted.embeds[0].toJSON());
+            assert.ok(json.includes('Seller'), 'embed vẫn có dòng Seller');
+            assert.ok(!json.includes('Note'), 'không có Note');
+            assert.ok(JSON.stringify(posted.components).includes('buy_acc_listacc'), 'có nút Buy');
+            assert.equal(posted.components[0].components.length, 2, '2 nút như /stock');
+            const acc = await db.getAccount('listacc');
+            assert.equal(acc.status, 'AVAILABLE'); assert.equal(acc.price, '150k');
+            assert.ok(acc.cardMessageId, 'lưu id tin card để cập nhật SOLD sau này');
+        } finally { listingRenderer.renderListing = realRender; }
+    });
+
     console.log('\n[7] Close / hủy đơn / dọn dẹp');
     await test('Close đơn chưa thanh toán: trả tài khoản về AVAILABLE, khôi phục nút BUY', async () => {
         const { cardCh, cardMsg } = await seedAccount('close1');

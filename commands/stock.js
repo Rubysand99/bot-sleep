@@ -11,6 +11,7 @@ const {
     OverwriteType 
 } = require('discord.js');
 const { renderCard } = require('../utils/cardRenderer');
+const listingRenderer = require('../utils/listingRenderer');
 const db = require('../utils/db');
 const C = require('../utils/constants');
 const { formatPriceDisplay } = require('../utils/money');
@@ -62,7 +63,18 @@ module.exports = {
                         .setRequired(false))
         ),
 
+    runStock,
+
     async execute(interaction) {
+        return runStock(interaction);
+    }
+};
+
+// Dùng chung cho /stock acc và /dang_anh: tạo kênh theo giá trong danh mục STOCK_ID, đăng embed (ảnh + nút Buy / Cách mua).
+//  listing = true  (/dang_anh): ảnh mẫu MFA listing (skin 2D, cape, giá), embed KHÔNG có Note
+//  listing = false (/stock acc): ảnh card cũ, embed có Note
+async function runStock(interaction, { listing = false } = {}) {
+    {
         const ownerId = process.env.OWNER_ID;
         const staffRoleId = cfg('STAFF_ROLE_ID', interaction.guild);
 
@@ -118,14 +130,16 @@ module.exports = {
             const uniqueCapes = Array.from(new Set(foundEmojis));
             capes = uniqueCapes.join(' ');
 
-            const imageBuffer = await renderCard({ 
-                username, 
-                price, 
-                rank,
-                capes,
-                statshpx,
-                statsdonut
-            });
+            const imageBuffer = listing
+                ? await listingRenderer.renderListing({ username, price, capes })
+                : await renderCard({
+                    username,
+                    price,
+                    rank,
+                    capes,
+                    statshpx,
+                    statsdonut
+                });
 
             if (!imageBuffer) {
                 return await interaction.editReply({ content: '❌ Không thể tạo ảnh card!' });
@@ -146,7 +160,7 @@ module.exports = {
             });
 
             // Gói card trong Embed và thêm dòng Seller
-            const stockNote = buildStockNote({ guild: interaction.guild });
+            const stockNote = listing ? '' : buildStockNote({ guild: interaction.guild });
             const embed = new EmbedBuilder()
                 .setDescription(`${emojis.text('info', interaction.guildId)} **Seller:** <@${sellerId}>` + (stockNote ? `\n\n${stockNote}` : ''))
                 .setImage('attachment://card.png')
@@ -291,4 +305,4 @@ module.exports = {
             }
         }
     }
-};
+}

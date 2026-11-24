@@ -42,7 +42,7 @@ function buildHelpEmbed(member) {
             ['bxh', '`/leaderboard`: bảng xếp hạng khách mua nhiều nhất.'],
             ['common', '`/sticky set|remove`: ghim tin nhắn tự động ở kênh.'],
             ['common', '`/emoji check|set|reset|list`: kiểm tra / đặt các emoji bot dùng (ưu tiên emoji custom, lưu riêng từng server).'],
-            ['autobuy', '`/dang_anh username price [capes]`: đăng ảnh tài khoản kèm giá (mẫu MFA: skin 2D, danh sách cape, giá). Không tạo ticket / nút mua.'],
+            ['autobuy', '`/dang_anh username price [capes]`: đăng bán acc bằng ảnh mẫu MFA (tạo kênh theo giá + nút Buy, giống `/stock acc` nhưng ảnh khác và không có Note).'],
             ['autobuy', '`/skin username`: xem skin Minecraft.'],
             ['sold', '`/taokenh ten danhmuc`, `/xoakenh kenh|id`: tạo / xóa kênh (slash: chọn danh mục ngay trong lệnh).'],
             ['autobuy', 'Trong ticket: nút **Confirm** và nút **Gửi lại thông tin**.']
