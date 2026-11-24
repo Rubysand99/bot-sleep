@@ -37,6 +37,8 @@ const { syncBotVersion } = require('./utils/version');
 const { isPanelButton, buildPanelPayload, handlePanelButton } = require('./utils/panel');
 const { buildLeaderboardPayload, refreshLeaderboardMessage } = require('./commands/leaderboard');
 const { processDone } = require('./commands/done');
+const payos = require('./utils/payos');
+const payosCommand = require('./commands/payos');
 const { cfg, setGuildResolver, legitChannelFor, getExtraStaff, getExtraOwners, isLegitEnabled, isLegitChannel, getLegitChannelMap } = require('./utils/runtime');
 const { loadConfig, setLegitChannel } = require('./utils/config');
 const { scheduleLegitRename, isLegitMessage } = require('./utils/legit');
@@ -164,6 +166,7 @@ async function handleCancelTicket(channelId) {
     const ticket = await db.deleteTicket(channelId);
     if (!ticket) return false;
     if (ticket.confirmed) return true;   // đã bán rồi: không khôi phục
+    if (ticket.payos && ticket.payos.state === 'pending') cancelPayosLink(ticket).catch(() => null);
 
     const username = ticket.usernameLower || String(ticket.username || '').toLowerCase();
     if (!username) return true;
@@ -245,6 +248,94 @@ async function sendCredentialsDM(user, account, creds, guild, out = {}) {
     } catch (err) {
         out.error = err;
         return false;
+    }
+}
+
+// ==========================================
+// payOS: kênh riêng từng seller, bot tự kiểm tra thanh toán và tự giao acc
+// ==========================================
+// Khóa của seller (lưu mã hóa). Riêng đơn của Owner: nếu Owner chưa cài thì dùng PAYOS_CLIENT_ID / PAYOS_API_KEY / PAYOS_CHECKSUM_KEY trong .env
+async function payosCredsFor(sellerId) {
+    if (!sellerId) return null;
+    const own = await db.getPayosChannel(sellerId);
+    if (own) return own;
+    const ownerId = process.env.OWNER_ID;
+    const { PAYOS_CLIENT_ID: clientId, PAYOS_API_KEY: apiKey, PAYOS_CHECKSUM_KEY: checksumKey } = process.env;
+    if (isValidSnowflake(ownerId) && String(sellerId) === ownerId.trim() && clientId && apiKey && checksumKey) {
+        return { clientId: clientId.trim(), apiKey: apiKey.trim(), checksumKey: checksumKey.trim() };
+    }
+    return null;
+}
+
+async function cancelPayosLink(ticket) {
+    const creds = await payosCredsFor(ticket.payos?.sellerId);
+    if (!creds) return;
+    await payos.cancelPaymentLink(creds, ticket.payos.orderCode).catch(err => log.warn('PAYOS', 'Không hủy được link payOS', { orderCode: ticket.payos.orderCode, loi: err.message }));
+}
+
+// Giả lập "bấm Confirm" để dùng lại đúng luồng giao acc của handleConfirm (khóa nguyên tử, DM, doanh thu, SOLD, nhắc legit)
+function autoConfirmInteraction(channel, ticket) {
+    return {
+        channelId: channel.id, channel, guild: channel.guild || client.guilds?.cache?.get(db.currentGuildId()), member: null,
+        user: { id: ticket.sellerId || process.env.OWNER_ID },
+        deferReply: async () => null,
+        reply: async (o) => channel.send(o).catch(() => null),
+        editReply: async (o) => {
+            if (String(o?.content || '').includes('đã được xác nhận trước đó')) return null;   // instance khác đã xử lý
+            return channel.send(o).catch(() => null);
+        }
+    };
+}
+
+async function checkPayosTicket(t) {
+    const creds = await payosCredsFor(t.payos.sellerId);
+    if (!creds) return;   // chưa còn khóa: staff bấm Confirm tay
+    let info;
+    try {
+        info = await payos.getPaymentInfo(creds, t.payos.orderCode);
+    } catch (err) {
+        log.warn('PAYOS', 'Hỏi trạng thái payOS lỗi (sẽ thử lại)', { ticket: t._id, loi: err.message });
+        return;
+    }
+    const status = String(info?.status || '').toUpperCase();
+    if (status === 'PENDING' || status === 'PROCESSING' || !status) return;
+
+    const channel = await client.channels.fetch(t._id).catch(() => null);
+    if (!channel || !channel.send) return;   // kênh đã xóa: reconcileOnStartup xử lý
+
+    const paid = Number(info.amountPaid ?? info.amount ?? 0);
+    if (status === 'PAID' && paid >= Number(t.payos.amount)) {
+        await db.updateTicket(t._id, { payos: { ...t.payos, state: 'paid', amountPaid: paid, paidAt: new Date().toISOString() }, paymentMethod: 'payOS (tự động xác nhận)' });
+        log.info('PAYOS', 'Đã nhận đủ tiền, tự giao acc', { ticket: t._id, orderCode: t.payos.orderCode, amount: paid });
+        await channel.send({ content: `💸 Bot đã nhận **${formatVND(paid)}** qua payOS. Đang tự động giao tài khoản cho <@${t.buyerId}>...` }).catch(() => null);
+        await handleConfirm(autoConfirmInteraction(channel, t));
+        return;
+    }
+
+    // Hết hạn / hủy / thiếu tiền: ngừng theo dõi, staff xử lý tay (nút Confirm vẫn dùng được)
+    const state = status === 'PAID' ? 'underpaid' : status.toLowerCase();
+    await db.updateTicket(t._id, { payos: { ...t.payos, state, amountPaid: paid } });
+    const why = status === 'EXPIRED' ? 'Link thanh toán payOS **đã hết hạn**'
+        : status === 'CANCELLED' ? 'Link thanh toán payOS **đã bị hủy**'
+        : `payOS báo trạng thái **${status}** (đã nhận ${formatVND(paid)} / cần ${formatVND(t.payos.amount)})`;
+    await channel.send({ content: `⚠️ ${why}. Nếu khách đã chuyển khoản, <@${t.sellerId || process.env.OWNER_ID}> kiểm tra rồi bấm **Confirm** để giao tay.` }).catch(() => null);
+}
+
+let payosRunning = false;
+async function runPayosChecks() {
+    if (payosRunning) return;   // lượt trước chưa xong thì bỏ qua, không chồng lượt
+    payosRunning = true;
+    try {
+        for (const gid of guildIdsToSweep()) {
+            await db.withGuild(gid, async () => {
+                const tickets = (await db.listTickets()).filter(t => t.payos && t.payos.state === 'pending' && !t.confirmed);
+                for (const t of tickets) {
+                    await checkPayosTicket(t).catch(err => log.error('PAYOS', 'Lỗi kiểm tra ticket', { ticket: t._id, ...errInfo(err) }));
+                }
+            }).catch(err => console.error('[Lỗi quét payOS]:', gid, err.message));
+        }
+    } finally {
+        payosRunning = false;
     }
 }
 
@@ -372,6 +463,7 @@ async function handleBuyInner(interaction) {
     const buyer = interaction.user;
     const sellerId = account.sellerId;
     let ticketChannel = null;
+    let payosLink = null;   // link payOS đã tạo (để hủy nếu tạo ticket lỗi giữa chừng)
 
     try {
         const rw = [
@@ -468,7 +560,33 @@ async function handleBuyInner(interaction) {
         const hasBankQR = !!(sellerQR && sellerQR.bankName && sellerQR.accountNumber);
         const linkQr = (process.env.LINK_QR || '').trim();
 
-        if (hasBankQR) {
+        // payOS: seller có kênh riêng thì tạo link/QR, bot tự kiểm tra tiền và tự giao acc. Lỗi thì rơi về VietQR + Confirm tay.
+        let payosQrBuf = null;
+        let payosFailed = false;
+        const payosCreds = await payosCredsFor(targetSellerId).catch(() => null);
+        if (payosCreds && numericAmount > 0) {
+            try {
+                const expireMin = parseInt(process.env.PAYOS_EXPIRE_MIN, 10) || 30;
+                const link = await payos.createPaymentLink(payosCreds, {
+                    orderCode: payos.newOrderCode(), amount: numericAmount, description: transferMemo,
+                    expiredAt: Math.floor(Date.now() / 1000) + expireMin * 60
+                });
+                payosQrBuf = await payos.qrToPng(link.qrCode);
+                payosLink = link;
+            } catch (err) {
+                payosFailed = true;
+                log.error('PAYOS', 'Tạo link payOS THẤT BẠI, dùng VietQR + Confirm tay', { nguoiBan: targetSellerId, loi: err.message });
+            }
+        }
+
+        if (payosLink) {
+            qrSource = 'payos';
+            qrInfoText =
+                `💰 **Số tiền:** \`${displayPrice}\`\n` +
+                (payosLink.accountNumber ? `💳 **Số tài khoản:** \`${payosLink.accountNumber}\`\n` : '') +
+                (payosLink.accountName ? `👤 **Chủ tài khoản:** \`${payosLink.accountName}\`\n` : '') +
+                `\n*Hãy **quét mã QR bên dưới** (đã điền sẵn số tiền và nội dung, không sửa). Bot tự động xác nhận và giao tài khoản khi nhận đủ tiền.*`;
+        } else if (hasBankQR) {
             qrImageUrl = buildVietQRUrl(sellerQR.bankName, sellerQR.accountNumber, numericAmount, transferMemo, sellerQR.bankType);
             qrInfoText =
                 `🏦 **Ngân hàng:** \`${sellerQR.bankName}\`\n` +
@@ -492,10 +610,14 @@ async function handleBuyInner(interaction) {
         }
         log.info('QR', 'Chọn nguồn QR cho ticket', { nguon: qrSource, nguoiBan: targetSellerId, coAnh: !!qrImageUrl });
         // Lưu phương thức thanh toán để ghi vào bill
-        const paymentMethod = qrSource === 'LINK_QR' ? 'QR của shop (LINK_QR)'
+        const paymentMethod = qrSource === 'payos' ? 'payOS (chờ thanh toán)'
+            : qrSource === 'LINK_QR' ? 'QR của shop (LINK_QR)'
             : qrSource === 'khong_co' ? 'Chuyển khoản thủ công (staff gửi STK)'
             : `VietQR · ${sellerQR.bankName}`;
-        await db.updateTicket(ticketChannel.id, { paymentMethod }).catch(() => null);
+        await db.updateTicket(ticketChannel.id, {
+            paymentMethod,
+            ...(payosLink ? { payos: { orderCode: payosLink.orderCode, paymentLinkId: payosLink.paymentLinkId || null, amount: numericAmount, sellerId: targetSellerId, state: 'pending', expiresAt: (payosLink.expiredAt || 0) * 1000 } } : {})
+        }).catch(() => null);
 
         const embed = new EmbedBuilder()
             .setTitle(`🛒 ĐƠN MUA TÀI KHOẢN: ${account.username.toUpperCase()}`)
@@ -503,13 +625,17 @@ async function handleBuyInner(interaction) {
             .setDescription(
                 `Xin chào <@${buyer.id}>! Bạn đang tạo đơn mua tài khoản **${account.username}**.\n\n` +
                 `${qrInfoText}\n\n` +
-                `*Vui lòng thanh toán đúng số tiền và nội dung chuyển khoản trên, sau đó gửi ảnh bill tại kênh này!*\n` +
+                (payosLink
+                    ? `*Thanh toán xong, bot sẽ **tự động giao tài khoản**, bạn không cần gửi bill.*\n`
+                    : `*Vui lòng thanh toán đúng số tiền và nội dung chuyển khoản trên, sau đó gửi ảnh bill tại kênh này!*\n`) +
                 `*Staff/Owner gõ \`.close\` để đóng ticket.*`
             )
             .setFooter({ text: `${profile.current().name} • Vui lòng chờ người bán xác nhận` })
             .setTimestamp();
 
-        const qrImg = await prepareQrImage(qrImageUrl, { ticket: ticketChannel.id });
+        const qrImg = payosLink
+            ? { files: [new AttachmentBuilder(payosQrBuf, { name: 'qr.png' })], imageUrl: 'attachment://qr.png' }
+            : await prepareQrImage(qrImageUrl, { ticket: ticketChannel.id });
         if (qrImg.imageUrl) embed.setImage(qrImg.imageUrl);
 
         // Ticket chỉ đóng khi Staff/Owner gõ .close (không còn nút Close, khách không tự đóng được)
@@ -533,8 +659,15 @@ async function handleBuyInner(interaction) {
             await ticketChannel.send(ticketMsg);
         }
 
+        if (payosFailed) {
+            await ticketChannel.send({ content: '⚠️ Không tạo được mã thanh toán tự động, đơn này sẽ **xác nhận thủ công** (người bán bấm Confirm sau khi nhận tiền).' }).catch(() => null);
+        }
         await interaction.editReply({ content: `✅ Đã tạo kênh ticket cho bạn: <#${ticketChannel.id}>` });
     } catch (err) {
+        if (payosLink) {
+            const c = await payosCredsFor(sellerId || ownerId).catch(() => null);
+            if (c) payos.cancelPaymentLink(c, payosLink.orderCode).catch(() => null);
+        }
         // Có lỗi sau khi giữ chỗ: trả tài khoản về trạng thái bán và dọn kênh dở dang
         console.error('[LỖI TẠO ĐƠN]:', err);
         if (ticketChannel) {
@@ -979,7 +1112,7 @@ async function handleClose(interaction) {
 // INTERACTION CREATE
 // ==========================================
 // Lệnh slash chỉ dành cho Owner/Staff
-const STAFF_RESTRICTED_COMMANDS = ['restock', 'leaderboard', 'skin', 'dang_anh', 'done', 'stock', 'add_acc', 'sticky', 'taokenh', 'xoakenh'];
+const STAFF_RESTRICTED_COMMANDS = ['restock', 'leaderboard', 'skin', 'dang_anh', 'done', 'stock', 'add_acc', 'sticky', 'taokenh', 'xoakenh', 'payos'];
 // Lệnh chỉ Owner dùng được
 const OWNER_ONLY_COMMANDS = ['staff', 'config', 'set_kenhsold', 'owner'];
 
@@ -1017,6 +1150,10 @@ async function handleInteractionInner(interaction) {
         }
 
         if (interaction.isModalSubmit()) {
+            if (String(interaction.customId).startsWith(payosCommand.MODAL_PREFIX)) {
+                if (!profile.has('autobuy')) return await featureOff(interaction);
+                return await payosCommand.handleModal(interaction);
+            }
             if (interaction.customId === 'modal_add_acc') {
                 if (!profile.has('autobuy')) return await featureOff(interaction);
                 if (!checkStaffOrOwner(interaction.member)) {
@@ -1792,6 +1929,7 @@ client.once(Events.ClientReady || 'ready', async () => {
     if (profile.has('legit')) await scanLegitChannels().catch(err => console.error('[LỖI QUÉT LEGIT]:', err));
     if (profile.has('bxh')) await refreshLeaderboardMessage(client).catch(() => null);   // bảng xếp hạng luôn khớp dữ liệu sau mỗi lần khởi động
     if (profile.has('autobuy')) setInterval(() => runQrRequests().catch(err => console.error('[Lỗi quét yêu cầu QR]:', err.message)), 60_000);
+    if (profile.has('autobuy')) setInterval(() => runPayosChecks().catch(err => console.error('[Lỗi quét payOS]:', err.message)), Math.max(3, parseInt(process.env.PAYOS_POLL_SEC, 10) || 5) * 1000);
     if (profile.has('autobuy')) setInterval(() => runVouchReminders().catch(err => console.error('[Lỗi quét nhắc vouch]:', err.message)), 60_000);
 });
 
@@ -1829,5 +1967,5 @@ if (require.main === module) {
 
 module.exports = {
     client, handleInteraction, handleMessage, handleCancelTicket, closeTicketChannel,
-    runVouchReminders, reconcileOnStartup, logGuildDiagnostics, scanLegitChannels, resendCredentials, toSoldName, toPendingName, toAvailableName
+    runVouchReminders, runPayosChecks, reconcileOnStartup, logGuildDiagnostics, scanLegitChannels, resendCredentials, toSoldName, toPendingName, toAvailableName
 };

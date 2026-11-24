@@ -14,7 +14,7 @@ function buildHelpEmbed(member) {
     const customer = pick([
         ['autobuy', '1. Bấm nút **BUY** trên card tài khoản bạn muốn mua, bot sẽ tạo ticket riêng.'],
         ['autobuy', '2. Chuyển khoản đúng số tiền và đúng **nội dung CK** trong ticket, rồi gửi ảnh bill vào ticket.'],
-        ['autobuy', '3. Chờ người bán bấm **Confirm**. Bot sẽ gửi thông tin tài khoản qua **tin nhắn riêng (DM)**, nhớ bật nhận DM từ thành viên server.'],
+        ['autobuy', '3. Chờ người bán bấm **Confirm** (đơn có mã payOS thì bot tự xác nhận khi nhận đủ tiền, không cần gửi bill). Bot sẽ gửi thông tin tài khoản qua **tin nhắn riêng (DM)**, nhớ bật nhận DM từ thành viên server.'],
         ['legit', '• Sau khi nhận hàng, vào kênh legit gõ: `+1 legit @người_bán mfa` (bot sẽ react xác nhận).'],
         ['common', '`.av` hoặc `.av @người_dùng`: xem avatar.'],
         ['bxh', '`.bxh`: xem bảng xếp hạng top khách mua nhiều nhất.'],
@@ -37,13 +37,14 @@ function buildHelpEmbed(member) {
         const slash = pick([
             ['autobuy', '`/add_acc`: mở form dán thông tin tài khoản vào kho (bot mã hóa mật khẩu).'],
             ['autobuy', '`/stock acc username price`: đăng card bán kèm nút BUY (tùy chọn: capes, rank, statshpx, statsdonut).'],
-            ['autobuy', '`/set_qr bank_name account_number bank_type`: cài ngân hàng để bot tạo VietQR (người thường: Owner xác nhận qua DM mới có hiệu lực).'],
+            ['autobuy', '`/set_qr bank_name account_number bank_type`: cài ngân hàng tạo VietQR (người thường: Owner xác nhận qua DM).'],
+            ['autobuy', '`/payos set|xem|kiem_tra|xoa`: kênh payOS riêng, bot tự nhận tiền và giao acc.'],
             ['autobuy', '`/restock`: đăng danh sách các kênh đang còn hàng.'],
             ['bxh', '`/done customer amount`: ghi doanh thu thủ công' + (profile.has('autobuy') ? ' (không dùng nếu đã Confirm).' : '.')],
             ['bxh', '`/leaderboard`: bảng xếp hạng khách mua nhiều nhất.'],
             ['common', '`/sticky set|remove`: ghim tin nhắn tự động ở kênh.'],
             ['common', '`/emoji check|set|reset|list`: kiểm tra / đặt các emoji bot dùng (ưu tiên emoji custom, lưu riêng từng server).'],
-            ['autobuy', '`/dang_anh image price`: đăng acc Liên Quân chỉ với ảnh + giá (tạo kênh theo giá + nút Buy như `/stock acc`, không Note).'],
+            ['autobuy', '`/dang_anh image price`: đăng acc Liên Quân chỉ với ảnh + giá (như `/stock acc`, không Note).'],
             ['autobuy', '`/skin username`: xem skin Minecraft.'],
             ['sold', '`/taokenh ten danhmuc`, `/xoakenh kenh|id`: tạo / xóa kênh (slash: chọn danh mục ngay trong lệnh).'],
             ['autobuy', 'Trong ticket: nút **Confirm** và nút **Gửi lại thông tin**.']

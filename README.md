@@ -7,7 +7,7 @@ Cùng một code, mỗi server một bot riêng (token riêng), chọn bằng bi
 
 | Tính năng | `drew` (server Drew) | `cartone` (server Cartone) |
 |---|---|---|
-| Auto buy (BUY, ticket, Confirm, kho acc, VietQR, `/stock`, `/dang_anh`, `/add_acc`, `/set_qr`, `/restock`, `/skin`, `/moc_role`, `.panel`, `.close`, `.resend`, `.vietqr`, nhắc vouch) | ✅ | ✅ |
+| Auto buy (BUY, ticket, Confirm, kho acc, VietQR, `/stock`, `/dang_anh`, `/add_acc`, `/set_qr`, `/payos`, `/restock`, `/skin`, `/moc_role`, `.panel`, `.close`, `.resend`, `.vietqr`, nhắc vouch) | ✅ | ✅ |
 | Bảng xếp hạng + ghi doanh thu (`.bxh`, `/leaderboard`, `.done`, `/done`), **dữ liệu riêng từng server** | ✅ | ✅ |
 | `sold`, `/set_kenhsold`, `.taokenh`, `.xoakenh` | ✅ | ✅ |
 | Auto react legit (3 emoji) | ✅ | ✅ |
@@ -131,7 +131,7 @@ Bot cần quyền **Manage Roles** và role của bot phải nằm **cao hơn** 
 **Slash**
 | Lệnh | Ai dùng |
 |---|---|
-| `/add_acc`, `/stock acc`, `/dang_anh`, `/set_qr`, `/restock`, `/done`, `/leaderboard`, `/sticky set\|remove`, `/skin`, `/taokenh ten [danhmuc]`, `/xoakenh kenh\|id` | Staff/Owner |
+| `/add_acc`, `/stock acc`, `/dang_anh`, `/set_qr`, `/payos`, `/restock`, `/done`, `/leaderboard`, `/sticky set\|remove`, `/skin`, `/taokenh ten [danhmuc]`, `/xoakenh kenh\|id` | Staff/Owner |
 | `/set_kenhsold`, `/config set\|clear\|show\|role_done\|debug\|legit_dem\|legit_count\|check_emoji`, `/staff add\|remove\|list\|role`, `/moc_role add\|remove\|list\|che_do\|sync\|kiemtra` | Owner |
 | `/owner list`, `/bot_avatar [doi_ten]` | Owner |
 | `/owner add\|remove` | Owner gốc (`OWNER_ID`) |
@@ -181,3 +181,15 @@ Xong thì xóa thư mục bot cũ vì có chứa mật khẩu dạng chữ thư�
 - **`.setqr @user MB 0123456789 TEN CHU TK`** (chỉ Owner): cài thông tin VietQR hộ người khác, tương đương họ tự gõ `/set_qr`. Xem lại bằng `.setqr xem @user`. Số tài khoản 6-20 chữ số, tên chủ tài khoản tự viết hoa.
 
 - **`/set_qr` ai cũng dùng được, Owner xác nhận mới có hiệu lực:** Owner tự gõ thì lưu ngay. Người khác gõ thì bot DM embed (nút **Xác nhận / Từ chối**) cho Owner gốc; quá 5 phút chưa ai bấm thì chuyển cho Owner phụ kế tiếp (lần lượt từng người); gửi hết các Owner rồi thì chỉ chờ, không gửi lại. Owner tắt DM thì bỏ qua ngay sang người kế. Thông tin chỉ được lưu và dùng tạo VietQR sau khi có Owner bấm Xác nhận; người gửi nhận DM kết quả. Gửi yêu cầu mới thì yêu cầu cũ còn chờ bị thay thế. Yêu cầu lưu trong database nên bot restart vẫn tiếp tục đếm 5 phút (bot quét mỗi phút).
+
+## payOS: tự kiểm tra thanh toán và tự giao acc
+
+Mỗi seller có thể có **kênh payOS riêng** (mỗi kênh liên kết 1 tài khoản ngân hàng, có Client ID / API Key / Checksum Key riêng). Tiền về đúng tài khoản của seller đăng acc.
+
+1. Seller tạo kênh trên my.payos.vn, rồi gõ **`/payos set`**: bot mở form riêng tư để nhập 3 khóa. Bot thử khóa (tạo rồi hủy link 2.000đ); khóa đúng mới lưu, **lưu mã hóa AES-GCM** bằng `DATA_ENCRYPTION_KEY`, không ghi log. Owner cài hộ người khác bằng tùy chọn `seller`.
+2. Khi khách bấm BUY acc của seller đó, bot tạo link payOS, gửi **QR payOS** trong ticket (không cần gửi bill).
+3. Bot hỏi payOS mỗi `PAYOS_POLL_SEC` giây (mặc định 5). Khi trạng thái **PAID** và đủ tiền, bot chạy đúng luồng của nút Confirm: DM thông tin acc, xóa khỏi kho, đánh dấu SOLD, ghi doanh thu, nhắc legit trong kênh ticket. Không cần webhook hay tên miền.
+4. Link hết hạn (`PAYOS_EXPIRE_MIN`, mặc định 30 phút), bị hủy hoặc thiếu tiền: bot báo seller, nút **Confirm** vẫn dùng tay được. Đóng ticket thì bot hủy link payOS.
+5. Seller **chưa cài payOS** hoặc tạo link lỗi thì đơn dùng VietQR + Confirm tay như cũ. Đơn của Owner dùng được `PAYOS_CLIENT_ID/API_KEY/CHECKSUM_KEY` trong `.env` nếu Owner chưa `/payos set`.
+
+Lệnh: `/payos set|xem|kiem_tra|xoa`. Sau khi cập nhật bot, lệnh slash mới cần được đăng ký lại (khởi động lại bot).
