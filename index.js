@@ -747,9 +747,9 @@ async function handleConfirm(interaction) {
         }
     }
 
-    // Gửi bill vào kênh BILL_ID
+    // Gửi bill vào kênh BILL_ID (acc đăng bằng /dang_anh - Liên Quân: không gửi bill)
     const billId = cfg('BILL_ID', interaction.guild) || process.env.BILL_ID;   // chưa đặt thì dùng kênh bill mặc định (DEFAULT_CHANNELS)
-    if (billId && isValidSnowflake(billId.trim())) {
+    if (account?.game !== 'lienquan' && billId && isValidSnowflake(billId.trim())) {
         try {
             const billChannel = await client.channels.fetch(billId.trim()).catch(() => null);
             if (billChannel) {
