@@ -589,17 +589,17 @@ const buildResendRow = (username) => new ActionRowBuilder().addComponents(
 
 // Khối Note của bill. Kênh và emoji đều đặt bằng biến (mỗi server một khác), dòng nào chưa đặt kênh thì bỏ qua.
 //  Kênh:  BILL_KENH_DIEUKHOAN, BILL_KENH_DOITHONGTIN, BILL_KENH_2FA (hoặc KENH_2FA / `/config`), BILL_KENH_LUUY
-//  Emoji: BILL_EMOJI_SET, BILL_EMOJI_NOTE, BILL_EMOJI_CARD, BILL_EMOJI_SETTINGS, BILL_EMOJI_KEY, BILL_EMOJI_WARNING (mặc định là emoji thường)
+//         (chưa đặt thì dùng kênh mặc định trong utils/constants.js > DEFAULT_CHANNELS, nếu kênh đó nằm trong server)
+//  Emoji: BILL_EMOJI_SET, BILL_EMOJI_NOTE, BILL_EMOJI_SETTINGS, BILL_EMOJI_KEY, BILL_EMOJI_WARNING (mặc định là emoji thường)
 //  Khác:  BILL_NOTE (dòng ghi chú chung), BILL_FOOTER (dòng nhỏ cuối Note, mặc định "<username seller> • AutoBuy Bot")
 const billEmoji = (name, def) => fromEnvTrim(`BILL_EMOJI_${name}`) || def;
-function buildBillNote({ guild, cardChannelId, sellerName }) {
+function buildBillNote({ guild, sellerName }) {
     const E = {
-        note: billEmoji('NOTE', '📝'), card: billEmoji('CARD', '🪪'), settings: billEmoji('SETTINGS', '⚙️'),
+        note: billEmoji('NOTE', '📝'), settings: billEmoji('SETTINGS', '⚙️'),
         key: billEmoji('KEY', '🔑'), warning: billEmoji('WARNING', '⚠️')
     };
-    const chId = (envName, cfgName) => (cfgName && cfg(cfgName, guild)) || fromEnvTrim(envName) || '';
+    const chId = (envName, ...alsoCfg) => cfg(envName, guild) || alsoCfg.map(n => cfg(n, guild)).find(Boolean) || '';
     const lines = [`--- ${E.note} Note ---`];
-    if (cardChannelId) lines.push(`${E.card} **Card:** <#${cardChannelId}>`);
     const rows = [
         ['📜', 'Điều khoản', chId('BILL_KENH_DIEUKHOAN')],
         [E.settings, 'Cách đổi thông tin', chId('BILL_KENH_DOITHONGTIN')],
@@ -732,7 +732,7 @@ async function handleConfirm(interaction) {
     }
 
     // Gửi bill vào kênh BILL_ID
-    const billId = cfg('BILL_ID', interaction.guild) || process.env.BILL_ID;
+    const billId = cfg('BILL_ID', interaction.guild) || process.env.BILL_ID;   // chưa đặt thì dùng kênh bill mặc định (DEFAULT_CHANNELS)
     if (billId && isValidSnowflake(billId.trim())) {
         try {
             const billChannel = await client.channels.fetch(billId.trim()).catch(() => null);
@@ -747,7 +747,6 @@ async function handleConfirm(interaction) {
                 const billText = `(${buyerMention}) Đã Mua tài khoản ( ${targetUsername} ) với giá ( ${targetPrice} )`;
                 const noteText = buildBillNote({
                     guild: interaction.guild,
-                    cardChannelId: ticket.cardChannelId || account?.cardChannelId,
                     sellerName: sellerUser?.username
                 });
 
@@ -943,7 +942,7 @@ async function handleClose(interaction) {
 // INTERACTION CREATE
 // ==========================================
 // Lệnh slash chỉ dành cho Owner/Staff
-const STAFF_RESTRICTED_COMMANDS = ['restock', 'leaderboard', 'set_qr', 'skin', 'done', 'stock', 'add_acc', 'sticky', 'taokenh', 'xoakenh'];
+const STAFF_RESTRICTED_COMMANDS = ['restock', 'leaderboard', 'set_qr', 'skin', 'dang_anh', 'done', 'stock', 'add_acc', 'sticky', 'taokenh', 'xoakenh'];
 // Lệnh chỉ Owner dùng được
 const OWNER_ONLY_COMMANDS = ['staff', 'config', 'set_kenhsold', 'owner'];
 
@@ -1741,5 +1740,5 @@ if (require.main === module) {
 
 module.exports = {
     client, handleInteraction, handleMessage, handleCancelTicket, closeTicketChannel,
-    runVouchReminders, reconcileOnStartup, logGuildDiagnostics, scanLegitChannels, resendCredentials, toSoldName, toPendingName, toAvailableName
+    runVouchReminders, reconcileOnStartup, logGuildDiagnostics, scanLegitChannels, resendCredentials, toSoldName, toPendingName, toAvailableName, buildBillNote
 };

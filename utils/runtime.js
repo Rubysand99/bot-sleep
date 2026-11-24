@@ -1,5 +1,6 @@
 // Cấu hình chạy (đọc nhanh, đồng bộ) gồm: ghi đè cấu hình bằng lệnh Discord + danh sách staff thêm bằng /staff.
 // Ưu tiên: /config (lưu DB) > biến môi trường (file .env trên VPS) > rỗng.
+const C = require('./constants');
 const overrides = new Map();
 // Staff / Owner phụ thêm bằng lệnh: tách theo TỪNG server (guildId -> Set userId). Owner gốc (OWNER_ID) có quyền ở mọi server.
 const extraStaff = new Map();
@@ -31,6 +32,15 @@ function sharedCfg(name) {
     return e && String(e).trim() ? String(e).trim() : '';
 }
 
+// Kênh mặc định trong code (constants.DEFAULT_CHANNELS): chỉ nhận khi kênh có thật trong server này
+function defaultChannel(name, guild) {
+    const id = C.DEFAULT_CHANNELS[name];
+    if (!id) return '';
+    const gid = gidOf(guild);
+    const g = (guild && typeof guild === 'object' && guild.channels?.cache) ? guild : (gid && guildResolver ? guildResolver(gid) : null);
+    return g?.channels?.cache?.has(id) ? id : '';
+}
+
 function cfg(name, guild) {
     const gid = gidOf(guild);
     if (gid) {
@@ -41,7 +51,8 @@ function cfg(name, guild) {
         }
     }
     const v = sharedCfg(name);
-    if (gid && v && /^\d{17,20}$/.test(v) && !existsInGuild(gid, v)) return '';
+    if (!v) return defaultChannel(name, guild);
+    if (gid && /^\d{17,20}$/.test(v) && !existsInGuild(gid, v)) return defaultChannel(name, guild);
     return v;
 }
 

@@ -5,6 +5,16 @@ const fromEnv = (name, fallback) => {
 };
 
 module.exports = {
+    // Kênh mặc định: bill + khối Note của bill. Chỉ dùng khi biến môi trường / lệnh /config CHƯA đặt,
+    // và chỉ nhận nếu kênh đó thật sự nằm trong server đang xử lý (server khác không bao giờ "mượn" kênh này).
+    DEFAULT_CHANNELS: {
+        BILL_ID: '1574382993567522826',
+        BILL_KENH_DIEUKHOAN: '1574315404644454410',
+        BILL_KENH_DOITHONGTIN: '1574309755428675634',
+        BILL_KENH_2FA: '1574313118517956618',
+        BILL_KENH_LUUY: '1574313882846101524'
+    },
+
     EMOJI_INFO: fromEnv('EMOJI_INFO', '<a:Info:1554714206870183996>'),
     EMOJI_ONLINE: fromEnv('EMOJI_ONLINE', '<a:X_online:1545982871716634784>'),
     EMOJI_OFFLINE: fromEnv('EMOJI_OFFLINE', '<a:X_offline:1545982880033800233>'),

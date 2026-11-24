@@ -475,4 +475,4 @@ async function renderCard(data) {
     return canvas.toBuffer('image/png');
 }
 
-module.exports = { renderCard };
+module.exports = { renderCard, extractAllEmojis, fetchBuffer, fetchSkinTexture };
