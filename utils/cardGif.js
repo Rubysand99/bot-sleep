@@ -16,7 +16,7 @@ const FONT = '"CardFallback", "Segoe UI", Arial, sans-serif';
 let BG_DIR = path.join(__dirname, '../assets/card_bg');
 if (!fs.existsSync(BG_DIR)) BG_DIR = path.join(process.cwd(), 'assets', 'card_bg');
 
-const BASE_COLORS = [[255, 255, 255], [255, 120, 190], [59, 130, 246], [16, 185, 129], [201, 160, 220], [219, 227, 245]];
+const BASE_COLORS = [[255, 255, 255], [255, 120, 190], [59, 130, 246], [201, 160, 220], [219, 227, 245]];
 
 function listBackgrounds() {
     try {
@@ -34,11 +34,6 @@ function roundRect(ctx, x, y, w, h, r) {
     ctx.closePath();
 }
 
-// Giá thẻ cào = giá bank cộng thêm % phí (mặc định +30%), làm tròn tới 5.000đ gần nhất
-function cardPriceOf(bank) {
-    const markup = Number(process.env.CARD_PRICE_MARKUP) > 0 ? Number(process.env.CARD_PRICE_MARKUP) : 1.3;
-    return Math.round((bank * markup) / 5000) * 5000;
-}
 const vnd = (n) => `${n.toLocaleString('vi-VN')}đ`;
 
 // Co chữ cho vừa bề ngang
@@ -163,11 +158,10 @@ async function buildOverlay(data, W, H) {
     ctx.fillText(accountName, 380, 134);
     ctx.restore();
 
-    // 2 ô giá
+    // Ô giá
     const bank = cardRenderer.parsePrice(data.price);
     const priceBoxes = [
-        { y: 172, dot: '#3b82f6', label: 'GIÁ BANK (VNĐ)', value: vnd(bank) },
-        { y: 310, dot: '#10b981', label: 'GIÁ THẺ CÀO (VNĐ)', value: vnd(cardPriceOf(bank)) }
+        { y: 190, dot: '#3b82f6', label: 'GIÁ BANK (VNĐ)', value: vnd(bank) }
     ];
     for (const box of priceBoxes) {
         ctx.save();
@@ -199,7 +193,7 @@ async function buildOverlay(data, W, H) {
     ctx.fillStyle = 'rgba(235,240,255,0.72)';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText('COSMETICS & CAPES', 380, 453);
+    ctx.fillText('COSMETICS & CAPES', 380, 350);
     ctx.restore();
 
     const capes = capeItemsOf(data.capes);
@@ -208,14 +202,14 @@ async function buildOverlay(data, W, H) {
         ctx.font = `bold 18px ${FONT}`;
         ctx.fillStyle = 'rgba(235,240,255,0.55)';
         ctx.textBaseline = 'middle';
-        ctx.fillText('NON', 380, 500);
+        ctx.fillText('NON', 380, 395);
         ctx.restore();
     }
-    const TILE_W = 84, TILE_H = 124, GAP = 14;
+    const TILE_W = 84, TILE_H = 142, GAP = 14;
     for (let i = 0; i < capes.length; i++) {
         const cape = capes[i];
         const x = 380 + i * (TILE_W + GAP);
-        const y = 472;
+        const y = 372;
         ctx.save();
         roundRect(ctx, x, y, TILE_W, TILE_H, 8);
         ctx.fillStyle = 'rgba(18,22,32,0.82)';
@@ -413,4 +407,4 @@ async function renderStockCard(data) {
     return { buffer: png, name: 'card.png' };
 }
 
-module.exports = { renderStockCard, cardPriceOf, buildOverlay };
+module.exports = { renderStockCard, buildOverlay };

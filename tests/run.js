@@ -364,8 +364,7 @@ const msgFor = (channel, authorId, content, member) => {
     });
 
     await test('card stock GIF: nền random 1 trong 2 GIF, đúng định dạng GIF động, dưới giới hạn dung lượng', async () => {
-        const { renderStockCard, cardPriceOf } = require(path.join(root, 'utils/cardGif'));
-        assert.equal(cardPriceOf(145000), 190000, 'giá thẻ cào = giá bank +30% làm tròn 5k (mẫu 145k -> 190k)');
+        const { renderStockCard } = require(path.join(root, 'utils/cardGif'));
         const r = await renderStockCard({ username: 'VuaRauMa', price: '145k', rank: 'NON', capes: '', botName: 'Test Bot' });
         assert.equal(r.name, 'card.gif');
         assert.equal(r.buffer.subarray(0, 6).toString(), 'GIF89a');
