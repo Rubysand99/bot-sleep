@@ -61,6 +61,8 @@ function buildUpdateEmbed({ botName, brand, version, previousVersion, entries, a
 // info: kết quả của syncBotVersion ({ version, tenths, bumped }); trả về true nếu đã gửi
 async function announceUpdate(client, info, root = ROOT) {
     if (!info || String(process.env.UPDATE_NOTICE || '').toLowerCase() === 'off') return false;
+    // Hiện chỉ bot Zin Yeah (BOT_PROFILE=cartone) báo cập nhật; bot Drew chưa dùng nên không gửi. UPDATE_NOTICE_DREW=on để bật lại cho Drew.
+    if (profile.current().id === 'drew' && String(process.env.UPDATE_NOTICE_DREW || '').toLowerCase() !== 'on') return false;
     const channelId = String(C.UPDATE_CHANNEL_ID || '').trim();
     if (!channelId) return false;
     const botId = client.user?.id || 'bot';

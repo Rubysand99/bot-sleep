@@ -77,6 +77,20 @@ const MD = '# Nhật ký\n\ngiới thiệu\n\n## 27/11 · Sửa lỗi B\n- fix B
         const ok = mkClient();
         assert.strictEqual(await U.announceUpdate(ok, { version: '2', tenths: 20, bumped: true }, root), true);
     });
+    await t('bot Drew chưa dùng: không gửi; bot Zin Yeah (cartone) gửi; UPDATE_NOTICE_DREW=on bật lại cho Drew', async () => {
+        const root = mkRoot(MD);
+        process.env.BOT_PROFILE = 'drew';
+        const d = mkClient();
+        assert.strictEqual(await U.announceUpdate(d, { version: '5', tenths: 50, bumped: true }, root), false);
+        assert.strictEqual(d.sent.length, 0);
+        process.env.BOT_PROFILE = 'cartone';
+        const z = mkClient();
+        assert.strictEqual(await U.announceUpdate(z, { version: '5', tenths: 50, bumped: true }, root), true);
+        assert.ok(z.sent[0].embeds[0].toJSON().footer.text.includes('Zin Yeah Store'));
+        process.env.BOT_PROFILE = 'drew'; process.env.UPDATE_NOTICE_DREW = 'on';
+        assert.strictEqual(await U.announceUpdate(mkClient(), { version: '6', tenths: 60, bumped: true }, root), true);
+        delete process.env.BOT_PROFILE; delete process.env.UPDATE_NOTICE_DREW;
+    });
     await t('UPDATE_NOTICE=off hoặc tắt version: không gửi', async () => {
         process.env.UPDATE_NOTICE = 'off';
         const cl = mkClient();
