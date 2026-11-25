@@ -385,7 +385,31 @@ const msgFor = (channel, authorId, content, member) => {
         assert.ok(f['🧑‍💼 Seller'] && f['🧑‍💼 Seller'] !== 'N/A', 'có tên seller');
         assert.equal(f['👤 Buyer'], buyer.username, 'có tên buyer');
         assert.ok(/\d/.test(f['💰 Đơn giá']) && f['💰 Đơn giá'].includes('đ'), 'có đơn giá: ' + f['💰 Đơn giá']);
-        assert.ok(e.description.includes('Username: dmcard1'), 'vẫn có thông tin đăng nhập');
+        for (const v of ['Username: dmcard1', 'Password: pw-dmcard1', 'Primary Email: a@b.c', 'Security Email: s@b.c', 'Recovery Code: rc', 'Secret Key: sk', 'MVP']) {
+            assert.ok(e.description.includes(v), 'DM buyer phải đủ thông tin: ' + v);
+        }
+    });
+
+    await test('bill: có ảnh stock nhưng KHÔNG có password / email / recovery code / secret key', async () => {
+        const BILL = '900000000000000998';
+        const billCh = makeChannel('bill');
+        billCh.id = BILL;
+        registry.set(BILL, billCh);
+        runtime.setOverride('BILL_ID@G', BILL);
+        try {
+            const { cardCh, cardMsg } = await seedAccount('bill1');
+            await buy('bill1', '800000000000000002', cardCh, cardMsg);
+            const ticketCh = guild.channels.created.at(-1).ch;
+            await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_bill1', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }));
+            const bill = billCh.sent.at(-1);
+            assert.ok(bill, 'có gửi bill');
+            assert.equal(bill.files.length, 1); assert.equal(bill.files[0].name, 'bill_card.gif');
+            assert.equal(bill.embeds[0].toJSON().image.url, 'attachment://bill_card.gif');
+            const text = JSON.stringify(bill.embeds[0].toJSON()) + bill.content;
+            for (const secret of ['pw-bill1', 'a@b.c', 's@b.c', 'Recovery', 'Secret', 'Password', 'rc"', 'sk"']) {
+                assert.ok(!text.includes(secret), 'bill không được lộ: ' + secret);
+            }
+        } finally { runtime.setOverride('BILL_ID@G', '-'); }
     });
 
     await test('card stock GIF: nền random 1 trong 2 GIF, đúng định dạng GIF động, dưới giới hạn dung lượng', async () => {

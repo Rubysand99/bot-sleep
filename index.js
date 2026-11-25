@@ -246,6 +246,8 @@ function buildCredentialsEmbed(account, creds, guild, ctx = {}) {
             { name: '💰 Đơn giá', value: ctx.priceText || 'N/A', inline: true }
         )
         .setDescription(
+            `### 🏅 Rank\n` +
+            `${String(account?.rank || '').trim() || 'NON'}\n\n` +
             `### 🏷️ Capes\n` +
             `${capesDisplay}\n\n` +
             `### 🔐 Thông Tin Đăng Nhập\n` +
