@@ -38,7 +38,6 @@ const { isPanelButton, buildPanelPayload, handlePanelButton } = require('./utils
 const { buildLeaderboardPayload, refreshLeaderboardMessage } = require('./commands/leaderboard');
 const { processDone } = require('./commands/done');
 const payos = require('./utils/payos');
-const payosCommand = require('./commands/payos');
 const { cfg, setGuildResolver, legitChannelFor, getExtraStaff, getExtraOwners, isLegitEnabled, isLegitChannel, getLegitChannelMap } = require('./utils/runtime');
 const { loadConfig, setLegitChannel } = require('./utils/config');
 const { scheduleLegitRename, isLegitMessage } = require('./utils/legit');
@@ -252,19 +251,16 @@ async function sendCredentialsDM(user, account, creds, guild, out = {}) {
 }
 
 // ==========================================
-// payOS: kênh riêng từng seller, bot tự kiểm tra thanh toán và tự giao acc
+// payOS (chỉ đơn của Owner): bot tự kiểm tra thanh toán và tự giao acc
 // ==========================================
-// Khóa của seller (lưu mã hóa). Riêng đơn của Owner: nếu Owner chưa cài thì dùng PAYOS_CLIENT_ID / PAYOS_API_KEY / PAYOS_CHECKSUM_KEY trong .env
+// Chỉ đơn của Owner dùng payOS: khóa nằm trong .env (PAYOS_CLIENT_ID / PAYOS_API_KEY / PAYOS_CHECKSUM_KEY).
+// Đơn của seller khác, hoặc chưa cấu hình khóa: giữ VietQR + Confirm tay.
 async function payosCredsFor(sellerId) {
-    if (!sellerId) return null;
-    const own = await db.getPayosChannel(sellerId);
-    if (own) return own;
     const ownerId = process.env.OWNER_ID;
     const { PAYOS_CLIENT_ID: clientId, PAYOS_API_KEY: apiKey, PAYOS_CHECKSUM_KEY: checksumKey } = process.env;
-    if (isValidSnowflake(ownerId) && String(sellerId) === ownerId.trim() && clientId && apiKey && checksumKey) {
-        return { clientId: clientId.trim(), apiKey: apiKey.trim(), checksumKey: checksumKey.trim() };
-    }
-    return null;
+    if (!sellerId || !isValidSnowflake(ownerId) || String(sellerId) !== ownerId.trim()) return null;
+    if (!clientId || !apiKey || !checksumKey) return null;
+    return { clientId: clientId.trim(), apiKey: apiKey.trim(), checksumKey: checksumKey.trim() };
 }
 
 async function cancelPayosLink(ticket) {
@@ -560,7 +556,7 @@ async function handleBuyInner(interaction) {
         const hasBankQR = !!(sellerQR && sellerQR.bankName && sellerQR.accountNumber);
         const linkQr = (process.env.LINK_QR || '').trim();
 
-        // payOS: seller có kênh riêng thì tạo link/QR, bot tự kiểm tra tiền và tự giao acc. Lỗi thì rơi về VietQR + Confirm tay.
+        // payOS: đơn của Owner (có khóa trong .env) thì tạo link/QR, bot tự kiểm tra tiền và tự giao acc. Lỗi thì rơi về VietQR + Confirm tay.
         let payosQrBuf = null;
         let payosFailed = false;
         const payosCreds = await payosCredsFor(targetSellerId).catch(() => null);
@@ -1112,7 +1108,7 @@ async function handleClose(interaction) {
 // INTERACTION CREATE
 // ==========================================
 // Lệnh slash chỉ dành cho Owner/Staff
-const STAFF_RESTRICTED_COMMANDS = ['restock', 'leaderboard', 'skin', 'dang_anh', 'done', 'stock', 'add_acc', 'sticky', 'taokenh', 'xoakenh', 'payos'];
+const STAFF_RESTRICTED_COMMANDS = ['restock', 'leaderboard', 'skin', 'dang_anh', 'done', 'stock', 'add_acc', 'sticky', 'taokenh', 'xoakenh'];
 // Lệnh chỉ Owner dùng được
 const OWNER_ONLY_COMMANDS = ['staff', 'config', 'set_kenhsold', 'owner'];
 
@@ -1150,10 +1146,6 @@ async function handleInteractionInner(interaction) {
         }
 
         if (interaction.isModalSubmit()) {
-            if (String(interaction.customId).startsWith(payosCommand.MODAL_PREFIX)) {
-                if (!profile.has('autobuy')) return await featureOff(interaction);
-                return await payosCommand.handleModal(interaction);
-            }
             if (interaction.customId === 'modal_add_acc') {
                 if (!profile.has('autobuy')) return await featureOff(interaction);
                 if (!checkStaffOrOwner(interaction.member)) {

@@ -111,12 +111,12 @@ function buttonInteraction({ customId, user, member, channel, message }) {
 }
 const lastText = (it) => JSON.stringify([...it.replies, ...it.edits]);
 
-async function seedAccount(name, { dmFails = false } = {}) {
+async function seedAccount(name, { dmFails = false, sellerId = SELLER } = {}) {
     const cardCh = makeChannel('✅・190k・3-cape', { parentId: STOCK_CAT });
     const cardMsg = makeCardMessage(name);
     cardCh.cardMsg = cardMsg;
     await db.upsertAccount(
-        { username: name, capes: 'x', price: '190k', rank: 'MVP', sellerId: SELLER, status: 'AVAILABLE', cardChannelId: cardCh.id, cardMessageId: cardMsg.id },
+        { username: name, capes: 'x', price: '190k', rank: 'MVP', sellerId, status: 'AVAILABLE', cardChannelId: cardCh.id, cardMessageId: cardMsg.id },
         { password: 'pw-' + name, primaryEmail: 'a@b.c', securityEmail: 's@b.c', recoveryCode: 'rc', secretKey: 'sk' }
     );
     return { cardCh, cardMsg };
@@ -743,9 +743,9 @@ const msgFor = (channel, authorId, content, member) => {
         process.env.SOLD_CATEGORY_ID = old;
     });
 
-    console.log('\n[8b] payOS: kênh riêng từng seller, tự kiểm tra thanh toán và tự giao acc');
+    console.log('\n[8b] payOS (chỉ đơn của Owner): tự kiểm tra thanh toán và tự giao acc');
     const payosMod = require(path.join(root, 'utils/payos'));
-    const payosOrig = { c: payosMod.createPaymentLink, g: payosMod.getPaymentInfo, x: payosMod.cancelPaymentLink, t: payosMod.testChannel };
+    const payosOrig = { c: payosMod.createPaymentLink, g: payosMod.getPaymentInfo, x: payosMod.cancelPaymentLink };
     let payosStatus = 'PENDING', payosCalls = [], payosCancelled = [], payosCreateFails = false;
     payosMod.createPaymentLink = async (creds, p) => {
         payosCalls.push({ creds, p });
@@ -754,8 +754,8 @@ const msgFor = (channel, authorId, content, member) => {
     };
     payosMod.getPaymentInfo = async (creds, orderCode) => ({ status: payosStatus, amount: 190000, amountPaid: payosStatus === 'PAID' ? 190000 : 0, orderCode });
     payosMod.cancelPaymentLink = async (creds, orderCode) => { payosCancelled.push(orderCode); return {}; };
-    payosMod.testChannel = async (creds) => { if (creds.apiKey === 'bad') throw new Error('payOS từ chối: Invalid api key'); return {}; };
     const ticketWith = (ch) => db.getTicket(ch.id);
+    Object.assign(process.env, { PAYOS_CLIENT_ID: 'cid', PAYOS_API_KEY: 'ak', PAYOS_CHECKSUM_KEY: 'ck' });
 
     await test('chữ ký tạo link payOS đúng định dạng HMAC-SHA256 theo thứ tự chữ cái', async () => {
         const crypto = require('crypto');
@@ -763,7 +763,7 @@ const msgFor = (channel, authorId, content, member) => {
         const expected = crypto.createHmac('sha256', 'key').update('amount=3000&cancelUrl=https://c&description=VQRIO123&orderCode=123&returnUrl=https://r').digest('hex');
         assert.equal(payosMod.signCreateBody(body, 'key'), expected);
     });
-    await test('seller KHÔNG có kênh payOS: giữ nguyên VietQR + Confirm tay, không gọi payOS', async () => {
+    await test('seller KHÁC Owner (dù .env có khóa payOS): giữ nguyên VietQR + Confirm tay, không gọi payOS', async () => {
         payosCalls = [];
         const buyer = users.get('800000000000000002');
         const { cardCh, cardMsg } = await seedAccount('pay0');
@@ -772,11 +772,10 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal(payosCalls.length, 0);
         assert.ok(!t.payos);
     });
-    await db.savePayosChannel(SELLER, { clientId: 'cid', apiKey: 'ak', checksumKey: 'ck' }, OWNER);
-    await test('seller có kênh payOS: tạo link bằng khóa của seller, gửi QR đính kèm, lưu payos vào ticket', async () => {
+    await test('đơn của Owner: tạo link bằng khóa trong .env, gửi QR đính kèm, lưu payos vào ticket', async () => {
         payosCalls = []; payosStatus = 'PENDING';
         const buyer = users.get('800000000000000002');
-        const { cardCh, cardMsg } = await seedAccount('pay1');
+        const { cardCh, cardMsg } = await seedAccount('pay1', { sellerId: OWNER });
         await buy('pay1', buyer.id, cardCh, cardMsg);
         const ticketCh = guild.channels.created.at(-1).ch;
         assert.equal(payosCalls.length, 1);
@@ -787,12 +786,8 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal(sent.files.length, 1);
         assert.ok(JSON.stringify(sent.embeds[0].data).includes('tự động giao tài khoản'));
         const t = await ticketWith(ticketCh);
-        assert.equal(t.payos.state, 'pending'); assert.equal(t.payos.sellerId, SELLER); assert.equal(t.payos.amount, 190000);
+        assert.equal(t.payos.state, 'pending'); assert.equal(t.payos.sellerId, OWNER); assert.equal(t.payos.amount, 190000);
         assert.equal(t.confirmed, false);
-    });
-    await test('khóa payOS được lưu MÃ HÓA, không có khóa dạng rõ trong DB', async () => {
-        const raw = JSON.stringify(FakeMongoClient.last.db('autobuy').collection('payos_channels').docs);
-        assert.ok(raw.includes('enc') && !raw.includes('"ak"') && !raw.includes('checksumKey'));
     });
     await test('chưa thanh toán: bot không giao; khi payOS báo PAID đủ tiền: tự giao acc, ghi doanh thu, hẹn nhắc legit trong kênh', async () => {
         const ticketCh = guild.channels.created.at(-1).ch; ticketCh.guild = guild;
@@ -816,7 +811,7 @@ const msgFor = (channel, authorId, content, member) => {
     await test('link hết hạn: ngừng theo dõi, báo staff bấm Confirm tay, không tự giao', async () => {
         payosStatus = 'PENDING';
         const buyer = users.get('800000000000000002');
-        const { cardCh, cardMsg } = await seedAccount('pay2');
+        const { cardCh, cardMsg } = await seedAccount('pay2', { sellerId: OWNER });
         await buy('pay2', buyer.id, cardCh, cardMsg);
         const ticketCh = guild.channels.created.at(-1).ch;
         payosStatus = 'EXPIRED';
@@ -831,7 +826,7 @@ const msgFor = (channel, authorId, content, member) => {
     await test('tạo link payOS lỗi: ticket vẫn tạo bằng VietQR, báo xác nhận thủ công', async () => {
         payosStatus = 'PENDING'; payosCreateFails = true;
         const buyer = users.get('800000000000000002');
-        const { cardCh, cardMsg } = await seedAccount('pay3');
+        const { cardCh, cardMsg } = await seedAccount('pay3', { sellerId: OWNER });
         await buy('pay3', buyer.id, cardCh, cardMsg);
         payosCreateFails = false;
         const ticketCh = guild.channels.created.at(-1).ch;
@@ -842,7 +837,7 @@ const msgFor = (channel, authorId, content, member) => {
     await test('đóng ticket đang chờ payOS: hủy link payOS', async () => {
         payosCancelled = []; payosStatus = 'PENDING';
         const buyer = users.get('800000000000000002');
-        const { cardCh, cardMsg } = await seedAccount('pay4');
+        const { cardCh, cardMsg } = await seedAccount('pay4', { sellerId: OWNER });
         await buy('pay4', buyer.id, cardCh, cardMsg);
         const ticketCh = guild.channels.created.at(-1).ch;
         const t = await ticketWith(ticketCh);
@@ -850,33 +845,8 @@ const msgFor = (channel, authorId, content, member) => {
         await new Promise(r => setTimeout(r, 20));
         assert.deepEqual(payosCancelled, [t.payos.orderCode]);
     });
-    const modalIt = (userId, targetId, vals, member) => {
-        const it = {
-            customId: 'modal_payos_' + targetId, user: { id: userId }, member, guild, guildId: guild.id, replies: [], edits: [],
-            fields: { getTextInputValue: (k) => vals[k] },
-            isChatInputCommand: () => false, isModalSubmit: () => true, isButton: () => false,
-            async reply(x) { it.replies.push(x); }, async deferReply() {}, async editReply(x) { it.edits.push(x); }
-        };
-        return it;
-    };
-    await test('form /payos set: khóa sai thì KHÔNG lưu; khóa đúng thì lưu cho chính mình; staff không cài hộ người khác được', async () => {
-        const S2 = '800000000000000555';
-        const bad = modalIt(S2, S2, { client_id: 'client-xx', api_key: 'bad', checksum_key: 'checksum-xx' }, makeMember(S2, [STAFF_ROLE]));
-        await index.handleInteraction(bad);
-        assert.ok(lastText(bad).includes('Chưa lưu'));
-        assert.equal(await db.hasPayosChannel(S2), false);
-        const ok = modalIt(S2, S2, { client_id: 'client-xx', api_key: 'good-key', checksum_key: 'checksum-xx' }, makeMember(S2, [STAFF_ROLE]));
-        await index.handleInteraction(ok);
-        assert.ok(lastText(ok).includes('Đã lưu kênh payOS'));
-        assert.equal((await db.getPayosChannel(S2)).apiKey, 'good-key');
-        const other = modalIt(S2, '800000000000000556', { client_id: 'client-xx', api_key: 'good-key', checksum_key: 'checksum-xx' }, makeMember(S2, [STAFF_ROLE]));
-        await index.handleInteraction(other);
-        assert.ok(lastText(other).includes('chính mình'));
-        assert.equal(await db.hasPayosChannel('800000000000000556'), false);
-        await db.deletePayosChannel(S2);
-    });
-    await db.deletePayosChannel(SELLER);
-    Object.assign(payosMod, { createPaymentLink: payosOrig.c, getPaymentInfo: payosOrig.g, cancelPaymentLink: payosOrig.x, testChannel: payosOrig.t });
+    delete process.env.PAYOS_CLIENT_ID; delete process.env.PAYOS_API_KEY; delete process.env.PAYOS_CHECKSUM_KEY;
+    Object.assign(payosMod, { createPaymentLink: payosOrig.c, getPaymentInfo: payosOrig.g, cancelPaymentLink: payosOrig.x });
 
     console.log('\n[9] Nhắc vouch (lưu DB, tối đa 3 lần) và /done');
     await test('nhắc vouch: gửi đúng 3 lần rồi dừng, không spam', async () => {
