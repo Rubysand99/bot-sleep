@@ -179,10 +179,10 @@ async function handleCancelTicket(channelId) {
     return true;
 }
 
-async function closeTicketChannel(channel, closedBy, delayMs = C.CLOSE_DELAY_MS) {
+async function closeTicketChannel(channel, closedBy, delayMs = C.CLOSE_DELAY_MS, note = '') {
     await sendTranscript(client, channel, {
         closedBy,
-        note: closedBy ? '' : '(tự động đóng sau khi khách legit)'
+        note: note || (closedBy ? '' : '(tự động đóng sau khi khách legit)')
     }).catch(err => console.error('[LỖI TRANSCRIPT]:', err.message));
     await handleCancelTicket(channel.id);
     setTimeout(() => channel.delete().catch(() => null), delayMs);
@@ -347,6 +347,34 @@ async function runPayosChecks() {
 async function runVouchReminders() {
     for (const gid of guildIdsToSweep()) {
         await db.withGuild(gid, () => runVouchRemindersForCurrentGuild()).catch(err => console.error('[Lỗi quét nhắc vouch]:', gid, err.message));
+    }
+}
+
+// Tự đóng ticket: đã xác nhận đơn quá C.AUTO_CLOSE_MS mà không ai gõ .close
+async function runAutoCloseTickets() {
+    for (const gid of guildIdsToSweep()) {
+        await db.withGuild(gid, () => runAutoCloseForCurrentGuild()).catch(err => console.error('[Lỗi quét tự đóng ticket]:', gid, err.message));
+    }
+}
+
+async function runAutoCloseForCurrentGuild() {
+    for (let n = 0; n < 50; n++) {
+        const t = await db.claimDueAutoClose(Date.now());
+        if (!t) return;
+        try {
+            const channel = await client.channels.fetch(t._id).catch(() => null);
+            if (!channel) { await handleCancelTicket(t._id); continue; }
+            // Chưa giao được thông tin acc cho khách (DM lỗi, còn chờ staff gửi lại): chưa đóng, hẹn lại để không mất đơn
+            if (t.delivery === 'pending') {
+                await db.updateTicket(t._id, { autoCloseAt: Date.now() + C.AUTO_CLOSE_MS });
+                continue;
+            }
+            await channel.send({ content: '⏰ Đơn đã xác nhận được 1 giờ và chưa có ai đóng, ticket sẽ **tự đóng** ngay bây giờ. Cảm ơn bạn đã mua hàng!' }).catch(() => null);
+            await closeTicketChannel(channel, null, C.CLOSE_DELAY_MS, '(tự động đóng sau 1 giờ kể từ khi xác nhận đơn)');
+        } catch (err) {
+            console.error('[Lỗi tự đóng ticket]:', t._id, err.message);
+            await db.updateTicket(t._id, { autoCloseAt: Date.now() + 5 * 60_000 }).catch(() => null);
+        }
     }
 }
 
@@ -759,7 +787,7 @@ async function handleConfirm(interaction) {
 
     // Khóa nguyên tử: bấm lần 2 (hoặc 2 người bấm cùng lúc) sẽ không làm gì cả.
     // Khóa xong ticket ở trạng thái delivery='pending' nên nếu có lỗi giữa chừng vẫn gửi lại / khôi phục được.
-    const locked = await db.lockTicketConfirm(interaction.channelId, interaction.user.id);
+    const locked = await db.lockTicketConfirm(interaction.channelId, interaction.user.id, C.AUTO_CLOSE_MS);
     if (!locked) {
         return await interaction.editReply({ content: '⚠️ Đơn này đã được xác nhận trước đó, không thể xác nhận lại.' });
     }
@@ -842,7 +870,7 @@ async function handleConfirm(interaction) {
             new EmbedBuilder()
                 .setTitle('✅ GIAO DỊCH THÀNH CÔNG')
                 .setColor(delivery === 'dm' ? '#00FF00' : '#FFAA00')
-                .setDescription(deliveryText + (milestone.length ? `\n\n${milestone.join('\n')}` : '') + '\n\n*Staff/Owner gõ `.close` để đóng ticket sau khi xong việc.*')
+                .setDescription(deliveryText + (milestone.length ? `\n\n${milestone.join('\n')}` : '') + '\n\n*Staff/Owner gõ `.close` để đóng ticket sau khi xong việc. Nếu không ai đóng, ticket tự đóng sau 1 giờ kể từ khi xác nhận đơn.*')
         ],
         components: delivery === 'pending' ? [buildResendRow(username)] : []
     });
@@ -1939,6 +1967,7 @@ client.once(Events.ClientReady || 'ready', async () => {
     if (profile.has('autobuy')) setInterval(() => runQrRequests().catch(err => console.error('[Lỗi quét yêu cầu QR]:', err.message)), 60_000);
     if (profile.has('autobuy')) log.info('PAYOS', 'payOS sẵn sàng: seller nào đã /payos set (hoặc Owner có PAYOS_* trong env) thì đơn dùng QR payOS, còn lại dùng VietQR + Confirm tay');
     if (profile.has('autobuy')) setInterval(() => runPayosChecks().catch(err => console.error('[Lỗi quét payOS]:', err.message)), Math.max(3, parseInt(process.env.PAYOS_POLL_SEC, 10) || 5) * 1000);
+    if (profile.has('autobuy')) setInterval(() => runAutoCloseTickets().catch(err => console.error('[Lỗi quét tự đóng ticket]:', err.message)), 60_000);
     if (profile.has('autobuy')) setInterval(() => runVouchReminders().catch(err => console.error('[Lỗi quét nhắc vouch]:', err.message)), 60_000);
 });
 
@@ -1975,6 +2004,6 @@ if (require.main === module) {
 }
 
 module.exports = {
-    client, handleInteraction, handleMessage, handleCancelTicket, closeTicketChannel,
+    client, handleInteraction, handleMessage, handleCancelTicket, closeTicketChannel, runAutoCloseTickets,
     runVouchReminders, runPayosChecks, reconcileOnStartup, logGuildDiagnostics, scanLegitChannels, resendCredentials, toSoldName, toPendingName, toAvailableName
 };

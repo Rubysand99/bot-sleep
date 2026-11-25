@@ -337,6 +337,45 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal((await db.getAccount('conf4')).status, 'PROCESSING');
     });
 
+    await test('tự đóng ticket 1 giờ sau khi xác nhận: chưa tới hạn thì giữ, quá hạn thì đóng, DM lỗi (pending) thì hẹn lại', async () => {
+        assert.equal(C.AUTO_CLOSE_MS, 3600000, 'mặc định 1 giờ');
+        const { cardCh, cardMsg } = await seedAccount('auto1');
+        await buy('auto1', '800000000000000002', cardCh, cardMsg);
+        const ticketCh = guild.channels.created.at(-1).ch;
+        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_auto1', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }));
+        const t = await db.getTicket(ticketCh.id);
+        assert.ok(t.autoCloseAt > Date.now() + C.AUTO_CLOSE_MS - 60000 && t.autoCloseAt <= Date.now() + C.AUTO_CLOSE_MS, 'hẹn đóng sau 1 giờ');
+
+        await index.runAutoCloseTickets();
+        assert.ok(await db.getTicket(ticketCh.id), 'chưa tới hạn thì chưa đóng');
+
+        // DM lỗi / chưa giao được thông tin: không tự đóng, hẹn lại
+        await db.updateTicket(ticketCh.id, { autoCloseAt: Date.now() - 1000, delivery: 'pending' });
+        await index.runAutoCloseTickets();
+        const again = await db.getTicket(ticketCh.id);
+        assert.ok(again && again.autoCloseAt > Date.now(), 'pending thì hẹn lại');
+
+        await db.updateTicket(ticketCh.id, { autoCloseAt: Date.now() - 1000, delivery: 'dm' });
+        await index.runAutoCloseTickets();
+        assert.equal(await db.getTicket(ticketCh.id), null, 'quá hạn thì đóng ticket');
+        assert.ok(JSON.stringify(ticketCh.sent).includes('tự đóng'), 'báo trong kênh trước khi đóng');
+        await new Promise(r => setTimeout(r, C.CLOSE_DELAY_MS + 50));
+        assert.equal(ticketCh.deleted, true);
+    });
+
+    await test('card stock GIF: nền random 1 trong 2 GIF, đúng định dạng GIF động, dưới giới hạn dung lượng', async () => {
+        const { renderStockCard, cardPriceOf } = require(path.join(root, 'utils/cardGif'));
+        assert.equal(cardPriceOf(145000), 190000, 'giá thẻ cào = giá bank +30% làm tròn 5k (mẫu 145k -> 190k)');
+        const r = await renderStockCard({ username: 'VuaRauMa', price: '145k', rank: 'NON', capes: '', botName: 'Test Bot' });
+        assert.equal(r.name, 'card.gif');
+        assert.equal(r.buffer.subarray(0, 6).toString(), 'GIF89a');
+        assert.ok(r.buffer.length < C.CARD_GIF_MAX_BYTES, 'dung lượng ' + r.buffer.length);
+        const { GifReader } = require('omggif');
+        const rd = new GifReader(r.buffer);
+        assert.ok(rd.numFrames() >= 20, 'GIF động nhiều khung: ' + rd.numFrames());
+        assert.equal(require('fs').readdirSync(path.join(root, 'assets/card_bg')).filter(f => f.endsWith('.gif')).length, 2, 'giữ 2 GIF nền');
+    });
+
     console.log('\n[6] DM thất bại: giữ thông tin, cho gửi lại, chặn đóng ticket');
     await test('DM lỗi -> delivery=pending, vẫn giữ credential, Close bị chặn, Gửi lại xong thì xóa', async () => {
         const buyer3 = makeUser('800000000000000003', { dmFails: true });

@@ -5,6 +5,11 @@ const fromEnv = (name, fallback) => {
 };
 
 module.exports = {
+    // Dòng credit nhỏ ở góc dưới card stock (GIF)
+    CARD_CREDIT: fromEnv('CARD_CREDIT', 'made by rubynek209'),
+    // Dung lượng tối đa của GIF card (byte); vượt thì tự giảm kích thước / khung hình. Discord mặc định cho tối đa ~10MB
+    CARD_GIF_MAX_BYTES: Number(process.env.CARD_GIF_MAX_BYTES) > 0 ? Number(process.env.CARD_GIF_MAX_BYTES) : 8 * 1024 * 1024,
+
     // Người DUY NHẤT được bấm nút Confirm (xác nhận đơn). Đơn payOS tự nhận tiền thì bot tự xác nhận, không cần người này.
     CONFIRM_USER_ID: fromEnv('CONFIRM_USER_ID', '1473293264613277798'),
 
@@ -62,6 +67,8 @@ module.exports = {
 
     // Ticket CHỈ đóng khi staff/owner gõ .close; kênh bị xóa sau số ms này
     CLOSE_DELAY_MS: 5_000,
+    // Sau khi xác nhận đơn, ticket tự đóng sau chừng này nếu không ai đóng (mặc định 1 giờ; AUTO_CLOSE_MIN đổi số phút)
+    AUTO_CLOSE_MS: (Number(process.env.AUTO_CLOSE_MIN) > 0 ? Number(process.env.AUTO_CLOSE_MIN) : 60) * 60_000,
 
     // Nhận diện tin legit linh hoạt (xem utils/legit.js > isLegitMessage): có "+1" và chữ legit / vouch ở BẤT KỲ vị trí nào.
     // Đặt LEGIT_REQUIRE_MENTION=true nếu muốn bắt buộc phải tag (@) người bán mới tính.

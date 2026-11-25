@@ -276,10 +276,22 @@ async function getTicketByUsername(username) {
 }
 
 // Xác nhận đơn đúng 1 lần: chỉ lần gọi đầu tiên trả về ticket, các lần sau trả về null.
-async function lockTicketConfirm(channelId, userId) {
+// autoCloseMs: sau chừng này ms kể từ lúc xác nhận mà không ai đóng thì bot tự đóng ticket (bỏ trống = không tự đóng)
+async function lockTicketConfirm(channelId, userId, autoCloseMs = 0) {
+    const set = { confirmed: true, delivery: 'pending', confirmedAt: now(), confirmedBy: String(userId) };
+    if (autoCloseMs > 0) set.autoCloseAt = Date.now() + autoCloseMs;
     return col('tickets').findOneAndUpdate(
         { _id: String(channelId), confirmed: { $ne: true } },
-        { $set: { confirmed: true, delivery: 'pending', confirmedAt: now(), confirmedBy: String(userId) } },
+        { $set: set },
+        { returnDocument: 'after' }
+    );
+}
+
+// Lấy 1 ticket đã đến hạn tự đóng (đúng 1 nơi nhận được; đặt autoCloseAt = null để lần quét sau không lấy lại)
+async function claimDueAutoClose(nowMs) {
+    return col('tickets').findOneAndUpdate(
+        { confirmed: true, autoCloseAt: { $lte: nowMs } },
+        { $set: { autoCloseAt: null } },
         { returnDocument: 'after' }
     );
 }
@@ -470,7 +482,7 @@ module.exports = {
     getAccount, findAccounts, findAccountByCardChannel, upsertAccount, updateAccount,
     claimAccount, releaseAccount, markAccountSold, getAccountCredentials, wipeCredentials,
     getStaffQR, saveStaffQR, getPayosChannel, savePayosChannel, hasPayosChannel, deletePayosChannel, resolveBotVersion,
-    getTicket, isTicketChannel, saveTicket, updateTicket, deleteTicket, listTickets, getTicketByUsername, lockTicketConfirm, markTicketRevenue, countOpenTicketsByBuyer,
+    getTicket, isTicketChannel, saveTicket, updateTicket, deleteTicket, listTickets, getTicketByUsername, lockTicketConfirm, claimDueAutoClose, markTicketRevenue, countOpenTicketsByBuyer,
     getSetting, saveSetting, getSettingsWithPrefix, nextLegitNumber,
     recordCustomerPurchase, setCustomerTotal, getCustomer, getAllCustomers, getTopCustomers,
     scheduleVouchReminder, getDueReminders, claimReminder, advanceReminder, deleteReminder, clearRemindersForBuyer,

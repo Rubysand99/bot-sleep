@@ -10,7 +10,7 @@ const {
     PermissionFlagsBits,
     OverwriteType 
 } = require('discord.js');
-const { renderCard } = require('../utils/cardRenderer');
+const { renderStockCard } = require('../utils/cardGif');
 const db = require('../utils/db');
 const C = require('../utils/constants');
 const { formatPriceDisplay } = require('../utils/money');
@@ -134,13 +134,14 @@ async function runStock(interaction) {
             if (!capesInfo.count && rankEmojis) capesInfo = parseCapes(rankEmojis);
             const capes = capesInfo.text;
 
-            const imageBuffer = await renderCard({
+            const botUser = interaction.client?.user;
+            const { buffer: imageBuffer, name: cardFileName } = await renderStockCard({
                 username,
                 price,
                 rank,
                 capes,
-                statshpx: '',
-                statsdonut: ''
+                botName: botUser?.displayName || botUser?.username || 'BOT',
+                botAvatarUrl: botUser?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null
             });
 
             if (!imageBuffer) {
@@ -160,7 +161,7 @@ async function runStock(interaction) {
             }
 
             const attachment = new AttachmentBuilder(imageBuffer, { 
-                name: 'card.png',
+                name: cardFileName,
                 description: `Minecraft Card: ${username}`
             });
 
@@ -168,7 +169,7 @@ async function runStock(interaction) {
             const stockNote = buildStockNote({ guild: interaction.guild });
             const embed = new EmbedBuilder()
                 .setDescription(`${emojis.text('info', interaction.guildId)} **Seller:** <@${sellerId}>` + (stockNote ? `\n\n${stockNote}` : ''))
-                .setImage('attachment://card.png')
+                .setImage(`attachment://${cardFileName}`)
                 .setColor('#2b2d31');
 
             const row = buildCardRow('available', accountKey, interaction.guildId);
