@@ -3,6 +3,9 @@ const { isOwnerId } = require('../utils/permissions');
 const { cfg, getExtraStaff, getExtraOwners } = require('../utils/runtime');
 const { addStaffUser, removeStaffUser, setConfig } = require('../utils/config');
 
+const ROLE_LABEL = { OWNER_ROLE_ID: 'Owner', STAFF_ROLE_ID: 'Staff', SELLER_ROLE_ID: 'Seller' };
+const roleText = (id) => (id ? `<@&${id}>` : '*(chưa đặt)*');
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('staff')
@@ -12,8 +15,10 @@ module.exports = {
         .addSubcommand(sub => sub.setName('remove').setDescription('Bỏ quyền Staff của một người')
             .addUserOption(o => o.setName('user').setDescription('Người cần bỏ').setRequired(true)))
         .addSubcommand(sub => sub.setName('list').setDescription('Xem danh sách Staff / Owner'))
-        .addSubcommand(sub => sub.setName('role').setDescription('Đặt role Staff (mọi người có role này đều là Staff)')
-            .addRoleOption(o => o.setName('role').setDescription('Role Staff').setRequired(true))),
+        .addSubcommand(sub => sub.setName('role').setDescription('Đặt role cho Owner / Staff / Seller: ai có role này bot tự nhận quyền tương ứng')
+            .addRoleOption(o => o.setName('role').setDescription('Role cần đặt').setRequired(true))
+            .addStringOption(o => o.setName('loai').setDescription('Role này là của ai (mặc định: Staff)')
+                .addChoices({ name: 'Owner', value: 'OWNER_ROLE_ID' }, { name: 'Staff', value: 'STAFF_ROLE_ID' }, { name: 'Seller', value: 'SELLER_ROLE_ID' }))),
 
     async execute(interaction) {
         if (!interaction.guildId) {
@@ -45,18 +50,21 @@ module.exports = {
 
         if (sub === 'role') {
             const role = interaction.options.getRole('role');
-            await setConfig('STAFF_ROLE_ID', role.id, interaction.guildId);
-            return await reply(`✅ Đã đặt role Staff = <@&${role.id}>`);
+            const key = interaction.options.getString('loai') || 'STAFF_ROLE_ID';
+            if (role.managed || role.id === interaction.guildId) return await reply('❌ Không dùng được role này (role của bot / tích hợp hoặc @everyone). Hãy chọn role thường.');
+            await setConfig(key, role.id, interaction.guildId);
+            return await reply(`✅ Đã đặt role ${ROLE_LABEL[key]} = <@&${role.id}>. Ai có role này là bot tự nhận quyền ${ROLE_LABEL[key]} ngay, không cần thêm từng người.`);
         }
 
         const users = getExtraStaff(interaction.guild);
-        const roleId = cfg('STAFF_ROLE_ID', interaction.guild);
         const embed = new EmbedBuilder()
             .setTitle('👥 Danh sách Staff / Owner')
             .setColor('#00FFAA')
             .setDescription(
                 `**Owner:** <@${process.env.OWNER_ID}>${getExtraOwners(interaction.guild).map(id => ` <@${id}>`).join('')}\n` +
-                `**Role Staff:** ${roleId ? `<@&${roleId}>` : '*(chưa đặt)*'}\n` +
+                `**Role Owner:** ${roleText(cfg('OWNER_ROLE_ID', interaction.guild))}\n` +
+                `**Role Staff:** ${roleText(cfg('STAFF_ROLE_ID', interaction.guild))}\n` +
+                `**Role Seller:** ${roleText(cfg('SELLER_ROLE_ID', interaction.guild))}\n` +
                 `**Staff thêm bằng /staff add ở server này (${users.length}):**\n` +
                 (users.length ? users.map(id => `• <@${id}>`).join('\n') : '*(trống)*'))
             .setFooter({ text: require('../utils/profile').current().name });

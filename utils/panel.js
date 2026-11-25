@@ -86,7 +86,9 @@ async function handlePanelButton(interaction, client) {
         { id: client.user.id, type: OverwriteType.Member, allow: [...rw, PermissionFlagsBits.ManageChannels] }
     ];
     const added = new Set([user.id, client.user.id]);
-    if (isValidSnowflake(staffRoleId)) overwrites.push({ id: staffRoleId.trim(), type: OverwriteType.Role, allow: rw });
+    for (const roleId of [staffRoleId, cfg('OWNER_ROLE_ID', guild)]) {
+        if (isValidSnowflake(roleId)) overwrites.push({ id: roleId.trim(), type: OverwriteType.Role, allow: rw });
+    }
     const staffIds = [...getExtraStaff(guild), ...getExtraOwners(guild)];
     if (isValidSnowflake(ownerId)) staffIds.push(ownerId.trim());
     for (const id of staffIds) {

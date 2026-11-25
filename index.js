@@ -489,8 +489,8 @@ async function handleBuyInner(interaction) {
                 ]
             }
         ];
-        if (isValidSnowflake(staffRoleId)) {
-            permissionOverwrites.push({ id: staffRoleId.trim(), type: OverwriteType.Role, allow: rw });
+        for (const roleId of [staffRoleId, cfg('OWNER_ROLE_ID', interaction.guild)]) {
+            if (isValidSnowflake(roleId)) permissionOverwrites.push({ id: roleId.trim(), type: OverwriteType.Role, allow: rw });
         }
         const alreadyAdded = new Set([buyer.id, client.user.id]);
         if (isValidSnowflake(sellerId)) {
@@ -1120,7 +1120,7 @@ async function handleClose(interaction) {
 // INTERACTION CREATE
 // ==========================================
 // Lệnh slash chỉ dành cho Owner/Staff
-const STAFF_RESTRICTED_COMMANDS = ['restock', 'leaderboard', 'skin', 'dang_anh', 'done', 'stock', 'add_acc', 'sticky', 'taokenh', 'xoakenh', 'payos'];
+const STAFF_RESTRICTED_COMMANDS = ['restock', 'leaderboard', 'skin', 'dang_anh', 'done', 'add_acc', 'sticky', 'taokenh', 'xoakenh', 'payos'];
 // Lệnh chỉ Owner dùng được
 const OWNER_ONLY_COMMANDS = ['staff', 'config', 'set_kenhsold', 'owner'];
 

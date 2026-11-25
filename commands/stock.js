@@ -16,7 +16,7 @@ const C = require('../utils/constants');
 const { formatPriceDisplay } = require('../utils/money');
 const { buildCardRow } = require('../utils/cardButtons');
 const emojis = require('../utils/emojis');
-const { checkStaffOrOwner } = require('../utils/permissions');
+const { canSell } = require('../utils/permissions');
 const { cfg } = require('../utils/runtime');
 const { buildStockNote } = require('../utils/stockNote');
 const { parseAccountFields } = require('../utils/accountForm');
@@ -72,9 +72,9 @@ module.exports = {
 // /stock acc: tạo kênh theo giá trong danh mục STOCK_ID, đăng card (ảnh + Note + nút Buy / Cách mua).
 async function runStock(interaction) {
     {
-        if (!checkStaffOrOwner(interaction.member)) {
+        if (!canSell(interaction.member)) {
             return await interaction.reply({ 
-                content: '❌ Bạn không có quyền đăng bán tài khoản (Chỉ dành cho Staff hoặc Owner)!', 
+                content: '❌ Bạn không có quyền đăng bán tài khoản (chỉ dành cho Owner, Staff hoặc Seller)!', 
                 flags: MessageFlags.Ephemeral 
             });
         }
@@ -89,9 +89,9 @@ async function runStock(interaction) {
             const sellerUser = interaction.options.getUser('seller');
             const createChannel = interaction.options.getBoolean('kenh') !== false;
 
-            // Seller phải là Owner / Staff của server này
+            // Seller phải là Owner / Staff / Seller (theo role của server này)
             const sellerMember = await interaction.guild.members.fetch(sellerUser.id).catch(() => null);
-            if (!checkStaffOrOwner(sellerMember)) {
+            if (!canSell(sellerMember)) {
                 return await interaction.editReply({
                     content: `❌ <@${sellerUser.id}> không phải Owner / Staff / Seller nên không thể đứng bán!`
                 });

@@ -82,7 +82,7 @@ function makeUser(id, { dmFails = false } = {}) {
 const guild = {
     id: 'G', name: 'Shop', iconURL: () => null,
     roles: { everyone: { id: 'EVERYONE' } },
-    members: { async fetch(id) { return makeMember(String(id), String(id) === SELLER ? [STAFF_ROLE] : []); } },
+    members: { async fetch(id) { return makeMember(String(id), String(id) === SELLER ? [STAFF_ROLE] : String(id) === '800000000000000088' ? ['950000000000000001'] : []); } },
     channels: {
         cache: new Map(),
         created: [],
@@ -448,6 +448,22 @@ const msgFor = (channel, authorId, content, member) => {
         await index.handleInteraction(bad);
         assert.ok(JSON.stringify(bad.edits).includes('không thể đứng bán'));
         assert.equal(guild.channels.created.length, before);
+
+        // role Seller (đặt bằng /staff role loai:Seller): đứng tên seller được, và tự gõ /stock acc được dù không phải Staff
+        await runtime.setOverride('SELLER_ROLE_ID@G', '950000000000000001');
+        const SELLER_ROLE_USER = '800000000000000088';
+        const bySellerRole = mk({ sotien: '30k', username: 'stk2' }, SELLER_ROLE_USER, false);
+        await index.handleInteraction(bySellerRole);
+        assert.equal((await db.getAccount('stk2'))?.sellerId, SELLER_ROLE_USER, 'người có role Seller đứng tên được ');
+        const selfSell = mk({ sotien: '30k', username: 'stk3' }, SELLER_ROLE_USER, false);
+        selfSell.user = { id: SELLER_ROLE_USER, bot: false }; selfSell.member = makeMember(SELLER_ROLE_USER, ['950000000000000001']);
+        await index.handleInteraction(selfSell);
+        assert.ok(await db.getAccount('stk3'), 'Seller tự đăng bán được');
+        const noRole = mk({ sotien: '30k', username: 'stk4' }, SELLER);
+        noRole.user = { id: '800000000000000099', bot: false }; noRole.member = makeMember('800000000000000099');
+        await index.handleInteraction(noRole);
+        assert.equal(await db.getAccount('stk4'), null, 'người không có role không đăng bán được');
+        runtime.setOverride('SELLER_ROLE_ID@G', '-');
 
         // đủ thông tin: nhapnhanh + ô riêng (ô riêng thắng)
         const it = mk({
