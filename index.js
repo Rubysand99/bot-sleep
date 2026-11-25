@@ -35,6 +35,7 @@ const { buildHelpEmbed } = require('./utils/help');
 const profile = require('./utils/profile');
 const { parseBxhText } = require('./utils/bxhImport');
 const { syncBotVersion } = require('./utils/version');
+const { announceUpdate } = require('./utils/updateNotice');
 const { isPanelButton, buildPanelPayload, handlePanelButton } = require('./utils/panel');
 const { buildLeaderboardPayload, refreshLeaderboardMessage } = require('./commands/leaderboard');
 const { processDone } = require('./commands/done');
@@ -1998,7 +1999,9 @@ client.once(Events.ClientReady || 'ready', async () => {
         servers: [...client.guilds.cache.values()].map(g => `${g.name}(${g.id})`).join(' | ')
     });
 
-    await syncBotVersion(client).catch(err => log.warn('VERSION', 'Không cập nhật được mô tả version', { loi: err.message }));
+    const versionInfo = await syncBotVersion(client).catch(err => { log.warn('VERSION', 'Không cập nhật được mô tả version', { loi: err.message }); return null; });
+    // Có bản mới (code đổi nên version tăng) thì báo embed vào kênh thông báo: version hiện tại, version trước, nội dung cập nhật
+    await announceUpdate(client, versionInfo).catch(err => log.warn('UPDATE', 'Không gửi được thông báo cập nhật', { loi: err.message }));
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {

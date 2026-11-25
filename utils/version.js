@@ -56,7 +56,7 @@ async function syncBotVersion(client, root = ROOT) {
     } else {
         log.info('VERSION', 'Mô tả bot đã đúng', { mota: want, code: fp });
     }
-    return { version: formatVersion(tenths), bumped, fingerprint: fp };
+    return { version: formatVersion(tenths), tenths, bumped, fingerprint: fp };
 }
 
 module.exports = { fingerprint, formatVersion, descriptionFor, stepTenths, startTenths, syncBotVersion };

@@ -5,6 +5,8 @@ const fromEnv = (name, fallback) => {
 };
 
 module.exports = {
+    // Kênh nhận embed thông báo mỗi lần bot cập nhật / sửa lỗi (UPDATE_NOTICE=off để tắt)
+    UPDATE_CHANNEL_ID: fromEnv('UPDATE_CHANNEL_ID', '1501883287902355516'),
     // Dòng credit nhỏ ở góc dưới card stock (GIF)
     CARD_CREDIT: fromEnv('CARD_CREDIT', 'made by rubynek209'),
     // Dung lượng tối đa của GIF card (byte); vượt thì tự giảm kích thước / khung hình. Discord mặc định cho tối đa ~10MB
