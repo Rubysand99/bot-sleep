@@ -18,7 +18,7 @@ let baseName = 'autobuy';
 // Server hiện tại được truyền ngầm qua AsyncLocalStorage: bọc xử lý bằng withGuild(guildId, fn).
 // Không có server trong ngữ cảnh (vd script, test) => dùng dữ liệu của server chính.
 const MAIN_GUILD_ID = String(process.env.MAIN_GUILD_ID || '1462789815333289986').trim();
-const GUILD_COLLECTIONS = new Set(['accounts', 'tickets', 'staff_qr', 'customers', 'reminders', 'qr_requests']);
+const GUILD_COLLECTIONS = new Set(['accounts', 'tickets', 'staff_qr', 'customers', 'reminders', 'qr_requests', 'payos_channels']);
 const als = new AsyncLocalStorage();
 const guildStores = new Map();        // guildId -> Promise<{ db, ticketIds }>
 
@@ -203,6 +203,28 @@ async function saveStaffQR(userId, qrData) {
         { upsert: true }
     );
     return true;
+}
+
+// Kênh payOS của từng seller (khóa lưu mã hóa AES-GCM, không bao giờ ghi log)
+async function getPayosChannel(sellerId) {
+    const doc = await col('payos_channels').findOne({ _id: String(sellerId) });
+    if (!doc || !doc.enc) return null;
+    try { return decryptJSON(doc.enc); } catch (err) { console.error('[LỖI GIẢI MÃ KÊNH PAYOS]:', sellerId, err.message); return null; }
+}
+async function savePayosChannel(sellerId, creds, updatedBy) {
+    await col('payos_channels').updateOne(
+        { _id: String(sellerId) },
+        { $set: { enc: encryptJSON({ clientId: creds.clientId, apiKey: creds.apiKey, checksumKey: creds.checksumKey }), updatedAt: now(), updatedBy: String(updatedBy || sellerId) } },
+        { upsert: true }
+    );
+    return true;
+}
+async function hasPayosChannel(sellerId) {
+    return !!(await col('payos_channels').findOne({ _id: String(sellerId) }));
+}
+async function deletePayosChannel(sellerId) {
+    const r = await col('payos_channels').deleteOne({ _id: String(sellerId) });
+    return (r.deletedCount || 0) > 0;
 }
 
 // ==========================================
@@ -447,7 +469,7 @@ module.exports = {
     connect, close, withGuild, currentGuildId, knownGuildIds, MAIN_GUILD_ID,
     getAccount, findAccounts, findAccountByCardChannel, upsertAccount, updateAccount,
     claimAccount, releaseAccount, markAccountSold, getAccountCredentials, wipeCredentials,
-    getStaffQR, saveStaffQR, resolveBotVersion,
+    getStaffQR, saveStaffQR, getPayosChannel, savePayosChannel, hasPayosChannel, deletePayosChannel, resolveBotVersion,
     getTicket, isTicketChannel, saveTicket, updateTicket, deleteTicket, listTickets, getTicketByUsername, lockTicketConfirm, markTicketRevenue, countOpenTicketsByBuyer,
     getSetting, saveSetting, getSettingsWithPrefix, nextLegitNumber,
     recordCustomerPurchase, setCustomerTotal, getCustomer, getAllCustomers, getTopCustomers,
