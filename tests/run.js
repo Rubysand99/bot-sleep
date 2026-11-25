@@ -26,6 +26,10 @@ const { encryptJSON, decryptJSON } = require(path.join(root, 'utils/crypto'));
 const { parseAccountForm } = require(path.join(root, 'utils/accountForm'));
 const { Collection } = require('discord.js');
 const runtime = require(path.join(root, 'utils/runtime'));
+// Render GIF thật mất vài giây / khung: các test dùng bản giả (test "card stock GIF" bên dưới gọi bản thật)
+const cardGifModule = require(path.join(root, 'utils/cardGif'));
+const realRenderStockCard = cardGifModule.renderStockCard;
+cardGifModule.renderStockCard = async () => ({ buffer: Buffer.from('GIF89a-test'), name: 'card.gif' });
 const legitUtil = require(path.join(root, 'utils/legit'));
 const C = require(path.join(root, 'utils/constants'));
 const { buildStockNote } = require(path.join(root, 'utils/stockNote'));
@@ -363,8 +367,29 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal(ticketCh.deleted, true);
     });
 
+    await test('giao acc: DM buyer có ảnh stock + thông tin acc + Seller / Buyer / Đơn giá', async () => {
+        const buyerId = '800000000000000002';
+        const buyer = users.get(buyerId);
+        const { cardCh, cardMsg } = await seedAccount('dmcard1');
+        await buy('dmcard1', buyerId, cardCh, cardMsg);
+        const ticketCh = guild.channels.created.at(-1).ch;
+        const before = buyer.dms.length;
+        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_dmcard1', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }));
+        const dm = buyer.dms.slice(before).find(x => x.embeds?.length);
+        assert.ok(dm, 'có DM giao acc');
+        assert.equal(dm.files.length, 1, 'DM kèm ảnh stock');
+        assert.equal(dm.files[0].name, 'card.gif');
+        const e = dm.embeds[0].toJSON();
+        assert.equal(e.image.url, 'attachment://card.gif', 'embed hiển thị ảnh stock');
+        const f = Object.fromEntries(e.fields.map(x => [x.name, x.value]));
+        assert.ok(f['🧑‍💼 Seller'] && f['🧑‍💼 Seller'] !== 'N/A', 'có tên seller');
+        assert.equal(f['👤 Buyer'], buyer.username, 'có tên buyer');
+        assert.ok(/\d/.test(f['💰 Đơn giá']) && f['💰 Đơn giá'].includes('đ'), 'có đơn giá: ' + f['💰 Đơn giá']);
+        assert.ok(e.description.includes('Username: dmcard1'), 'vẫn có thông tin đăng nhập');
+    });
+
     await test('card stock GIF: nền random 1 trong 2 GIF, đúng định dạng GIF động, dưới giới hạn dung lượng', async () => {
-        const { renderStockCard } = require(path.join(root, 'utils/cardGif'));
+        const renderStockCard = realRenderStockCard;
         const r = await renderStockCard({ username: 'VuaRauMa', price: '145k', rank: 'NON', capes: '', botName: 'Test Bot' });
         assert.equal(r.name, 'card.gif');
         assert.equal(r.buffer.subarray(0, 6).toString(), 'GIF89a');

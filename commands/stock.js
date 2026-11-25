@@ -10,7 +10,7 @@ const {
     PermissionFlagsBits,
     OverwriteType 
 } = require('discord.js');
-const { renderStockCard } = require('../utils/cardGif');
+const cardGif = require('../utils/cardGif');
 const db = require('../utils/db');
 const C = require('../utils/constants');
 const { formatPriceDisplay } = require('../utils/money');
@@ -135,7 +135,7 @@ async function runStock(interaction) {
             const capes = capesInfo.text;
 
             const botUser = interaction.client?.user;
-            const { buffer: imageBuffer, name: cardFileName } = await renderStockCard({
+            const { buffer: imageBuffer, name: cardFileName } = await cardGif.renderStockCard({
                 username,
                 price,
                 rank,

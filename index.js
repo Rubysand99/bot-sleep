@@ -21,7 +21,8 @@ const {
 
 const db = require('./utils/db');
 const C = require('./utils/constants');
-const { renderCard } = require('./utils/cardRenderer');
+const cardGif = require('./utils/cardGif');
+const { parsePrice: cardRendererParsePrice } = require('./utils/cardRenderer');
 const { parseAmount, formatVND } = require('./utils/money');
 const { parseAccountForm, maskEmail } = require('./utils/accountForm');
 const { isValidSnowflake, isOwnerId, checkStaffOrOwner } = require('./utils/permissions');
@@ -191,13 +192,45 @@ async function closeTicketChannel(channel, closedBy, delayMs = C.CLOSE_DELAY_MS,
 // ==========================================
 // GIAO THÔNG TIN TÀI KHOẢN QUA DM
 // ==========================================
-function buildCredentialsEmbed(account, creds, guild) {
+// Acc đăng không có username có mã nội bộ nonxxxxxx: hiển thị là NON, không coi mã đó là username thật
+const NON_KEY_RE = /^non[0-9a-f]{6}$/;
+const displayUsername = (name) => (NON_KEY_RE.test(String(name || '')) ? 'NON' : String(name || 'N/A'));
+
+// Ảnh stock (GIF) của 1 acc, dùng chung cho DM giao acc và bill. Nhớ tạm vài phút để 1 đơn chỉ render 1 lần.
+const accountCardCache = new Map();
+async function renderAccountCard(account, fallback = {}) {
+    const username = displayUsername(account?.username || fallback.username);
+    const price = account?.price || fallback.price || '';
+    const rank = account?.rank || 'NON';
+    const capes = account?.capes || '';
+    const key = [username, price, rank, capes].join('|');
+    const hit = accountCardCache.get(key);
+    if (hit && Date.now() - hit.at < 5 * 60_000) return hit.card;
+    try {
+        const card = await cardGif.renderStockCard({
+            username, price, rank, capes,
+            botName: client.user?.displayName || client.user?.username || 'BOT',
+            botAvatarUrl: client.user?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null
+        });
+        if (!card?.buffer) return null;
+        accountCardCache.set(key, { at: Date.now(), card });
+        while (accountCardCache.size > 20) accountCardCache.delete(accountCardCache.keys().next().value);
+        return card;
+    } catch (err) {
+        console.error('[LỖI ẢNH STOCK]:', err.message);
+        return null;
+    }
+}
+
+// ctx: { sellerName, buyerName, imageName } (đều tuỳ chọn)
+function buildCredentialsEmbed(account, creds, guild, ctx = {}) {
     const ytRef = formatRef(cfg('KENH_YOUTUBE', guild), 'KENH_YOUTUBE');
     const faRef = formatRef(cfg('KENH_2FA', guild), 'KENH_2FA');
     const lockRef = formatRef(cfg('KENH_LOCK', guild), 'KENH_LOCK');
     const vouchRef = formatRef(cfg('KENH_VOUCH', guild), 'KENH_VOUCH');
 
-    const targetUsername = account?.username || 'N/A';
+    const targetUsername = displayUsername(account?.username);
+    const hasRealName = targetUsername !== 'NON';
     const capesDisplay = account?.capes && account.capes.trim() ? account.capes.trim() : 'None';
 
     return new EmbedBuilder()
@@ -207,13 +240,17 @@ function buildCredentialsEmbed(account, creds, guild) {
         })
         .setTitle(`🎉 THÔNG TIN TÀI KHOẢN: ${targetUsername}`)
         .setColor('#00FF00')
-        .setThumbnail(`https://mc-heads.net/avatar/${targetUsername}/100.png`)
+        .addFields(
+            { name: '🧑‍💼 Seller', value: ctx.sellerName || 'N/A', inline: true },
+            { name: '👤 Buyer', value: ctx.buyerName || 'N/A', inline: true },
+            { name: '💰 Đơn giá', value: ctx.priceText || 'N/A', inline: true }
+        )
         .setDescription(
             `### 🏷️ Capes\n` +
             `${capesDisplay}\n\n` +
             `### 🔐 Thông Tin Đăng Nhập\n` +
             `\`\`\`text\n` +
-            `Username: ${targetUsername}\n` +
+            `Username: ${hasRealName ? targetUsername : 'N/A'}\n` +
             `Password: ${creds.password || 'N/A'}\n` +
             `Primary Email: ${creds.primaryEmail || 'N/A'}\n` +
             `Security Email: ${creds.securityEmail || 'N/A'}\n` +
@@ -233,16 +270,29 @@ function buildCredentialsEmbed(account, creds, guild) {
             text: `${profile.brand()} • Cảm ơn bạn đã tin tưởng và ủng hộ!`,
             iconURL: guild?.iconURL() || undefined
         })
-        .setTimestamp();
+        .setTimestamp()
+        .setImage(ctx.imageName ? `attachment://${ctx.imageName}` : null);
 }
 
 // out: (tuỳ chọn) object để nhận lỗi gốc ở out.error, giúp báo đúng lý do khi gửi thất bại
-async function sendCredentialsDM(user, account, creds, guild, out = {}) {
+// ticket: (tuỳ chọn) để ghi seller / buyer / đơn giá vào embed
+async function sendCredentialsDM(user, account, creds, guild, out = {}, ticket = null) {
     if (!user || !creds) return false;
     try {
+        const sellerId = ticket?.sellerId || account?.sellerId;
+        const sellerUser = sellerId ? await client.users.fetch(sellerId).catch(() => null) : null;
+        const card = await renderAccountCard(account, { username: ticket?.username, price: ticket?.price });
+        const priceNum = cardRendererParsePrice(account?.price || ticket?.price);
+        const ctx = {
+            sellerName: sellerUser ? (sellerUser.displayName || sellerUser.username) : (sellerId ? `<@${sellerId}>` : 'N/A'),
+            buyerName: user.displayName || user.username || 'N/A',
+            priceText: (account?.price || ticket?.price) ? cardGif.vnd(priceNum) : 'N/A',
+            imageName: card?.name
+        };
         await user.send({
             content: `Cảm ơn bạn đã mua tài khoản tại **${profile.brand()}**! Dưới đây là thông tin tài khoản của bạn:`,
-            embeds: [buildCredentialsEmbed(account, creds, guild)]
+            embeds: [buildCredentialsEmbed(account, creds, guild, ctx)],
+            files: card ? [new AttachmentBuilder(card.buffer, { name: card.name })] : []
         });
         return true;
     } catch (err) {
@@ -828,7 +878,7 @@ async function handleConfirm(interaction) {
             if (!buyerUser) {
                 delivery = 'pending';
                 problem = { stage: 'Không tìm thấy buyer trên Discord nên không gửi được DM' };
-            } else if (await sendCredentialsDM(buyerUser, account, creds, interaction.guild, out)) {
+            } else if (await sendCredentialsDM(buyerUser, account, creds, interaction.guild, out, ticket)) {
                 delivery = 'dm';
             } else {
                 delivery = 'pending';
@@ -931,16 +981,13 @@ async function handleConfirm(interaction) {
                 const billText = `(${buyerMention}) Đã Mua tài khoản ( ${targetUsername} ) với giá ( ${targetPrice} )`;
 
                 let billAttachment = null;
+                let billImageName = null;
                 if (account) {
-                    const billBuffer = await renderCard({
-                        username: targetUsername,
-                        price: targetPrice,
-                        rank: account.rank || 'NON',
-                        capes: account.capes || '',
-                        statshpx: account.statshpx || '',
-                        statsdonut: account.statsdonut || ''
-                    }).catch(() => null);
-                    if (billBuffer) billAttachment = new AttachmentBuilder(billBuffer, { name: 'bill_card.png' });
+                    const billCard = await renderAccountCard({ ...account, username: account.username || targetUsername, price: account.price || targetPrice });
+                    if (billCard) {
+                        billImageName = `bill_${billCard.name}`;
+                        billAttachment = new AttachmentBuilder(billCard.buffer, { name: billImageName });
+                    }
                 }
 
                 const unix = Math.floor(Date.now() / 1000);
@@ -959,7 +1006,7 @@ async function handleConfirm(interaction) {
                         { name: '🕒 Thời gian', value: `<t:${unix}:F> (<t:${unix}:R>)` }
                     )
                     .setTimestamp();
-                if (billAttachment) billEmbed.setImage('attachment://bill_card.png');
+                if (billAttachment) billEmbed.setImage(`attachment://${billImageName}`);
                 await billChannel.send({ content: billText, embeds: [billEmbed], ...(billAttachment ? { files: [billAttachment] } : {}) });
             } else {
                 await reportDeliveryProblem({ client, guild: interaction.guild, channel: interaction.channel, ticket, stage: `Không tìm thấy kênh bill (${billId.trim()}), bill chưa được gửi`, next: 'Kiểm tra BILL_ID / `/config` và quyền xem kênh của bot.', quiet: true });
@@ -1023,7 +1070,7 @@ async function resendCredentials({ channel, guild, ticket }) {
         return 'no_creds';
     }
     const dmOut = {};
-    if (!(await sendCredentialsDM(buyerUser, account, creds, guild, dmOut))) {
+    if (!(await sendCredentialsDM(buyerUser, account, creds, guild, dmOut, ticket))) {
         if (!isDmClosed(dmOut.error)) {
             await reportDeliveryProblem({ client, guild, channel, ticket, stage: buyerUser ? 'Gửi lại: gửi DM cho buyer thất bại' : 'Gửi lại: không tìm thấy buyer trên Discord', err: dmOut.error, quiet: true });
         }

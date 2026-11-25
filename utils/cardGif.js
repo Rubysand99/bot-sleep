@@ -407,4 +407,4 @@ async function renderStockCard(data) {
     return { buffer: png, name: 'card.png' };
 }
 
-module.exports = { renderStockCard, buildOverlay };
+module.exports = { renderStockCard, buildOverlay, vnd };
