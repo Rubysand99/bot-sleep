@@ -276,6 +276,7 @@ async function cancelPayosLink(ticket) {
 // Giả lập "bấm Confirm" để dùng lại đúng luồng giao acc của handleConfirm (khóa nguyên tử, DM, doanh thu, SOLD, nhắc legit)
 function autoConfirmInteraction(channel, ticket) {
     return {
+        autoConfirm: true,
         channelId: channel.id, channel, guild: channel.guild || client.guilds?.cache?.get(db.currentGuildId()), member: null,
         user: { id: ticket.sellerId || process.env.OWNER_ID },
         deferReply: async () => null,
@@ -318,7 +319,7 @@ async function checkPayosTicket(t) {
     const why = status === 'EXPIRED' ? 'Link thanh toán payOS **đã hết hạn**'
         : status === 'CANCELLED' ? 'Link thanh toán payOS **đã bị hủy**'
         : `payOS báo trạng thái **${status}** (đã nhận ${formatVND(paid)} / cần ${formatVND(t.payos.amount)})`;
-    await channel.send({ content: `⚠️ ${why}. Nếu khách đã chuyển khoản, <@${t.sellerId || process.env.OWNER_ID}> kiểm tra rồi bấm **Confirm** để giao tay.` }).catch(() => null);
+    await channel.send({ content: `⚠️ ${why}. Nếu khách đã chuyển khoản, <@${C.CONFIRM_USER_ID}> kiểm tra rồi bấm **Confirm** để giao tay.` }).catch(() => null);
 }
 
 let payosRunning = false;
@@ -667,7 +668,7 @@ async function handleBuyInner(interaction) {
         }
 
         if (payosFailed) {
-            await ticketChannel.send({ content: '⚠️ Không tạo được mã thanh toán tự động, đơn này sẽ **xác nhận thủ công** (người bán bấm Confirm sau khi nhận tiền).' }).catch(() => null);
+            await ticketChannel.send({ content: `⚠️ Không tạo được mã thanh toán tự động, đơn này sẽ **xác nhận thủ công** (<@${C.CONFIRM_USER_ID}> bấm Confirm sau khi nhận tiền).` }).catch(() => null);
         }
         await interaction.editReply({ content: `✅ Đã tạo kênh ticket cho bạn: <#${ticketChannel.id}>` });
     } catch (err) {
@@ -746,10 +747,10 @@ async function handleConfirm(interaction) {
         });
     }
 
-    const isSeller = interaction.user.id === ticket.sellerId;
-    if (!checkStaffOrOwner(interaction.member) && !isSeller) {
+    // Chỉ đúng 1 người (CONFIRM_USER_ID) được xác nhận đơn bằng tay. Bot tự xác nhận khi payOS đã nhận đủ tiền (autoConfirm).
+    if (!interaction.autoConfirm && String(interaction.user?.id) !== C.CONFIRM_USER_ID) {
         return await interaction.reply({
-            content: '❌ **Từ chối:** Bạn không có quyền Confirm đơn này!',
+            content: `❌ **Từ chối:** Chỉ <@${C.CONFIRM_USER_ID}> mới có quyền xác nhận đơn!`,
             flags: EPHEMERAL
         });
     }

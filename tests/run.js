@@ -82,6 +82,7 @@ function makeUser(id, { dmFails = false } = {}) {
 const guild = {
     id: 'G', name: 'Shop', iconURL: () => null,
     roles: { everyone: { id: 'EVERYONE' } },
+    members: { async fetch(id) { return makeMember(String(id), String(id) === SELLER ? [STAFF_ROLE] : []); } },
     channels: {
         cache: new Map(),
         created: [],
@@ -273,7 +274,7 @@ const msgFor = (channel, authorId, content, member) => {
         const ticket = await db.getTicket(ticketCh.id);
         assert.ok(ticket && ticket.buyerId === buyer1.id);
 
-        const it = buttonInteraction({ customId: 'ticket_confirm_conf1', user: { id: SELLER }, member: staffMember(), channel: ticketCh });
+        const it = buttonInteraction({ customId: 'ticket_confirm_conf1', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh });
         await index.handleInteraction(it);
 
         const dm = buyer1.dms.at(-1);
@@ -295,7 +296,7 @@ const msgFor = (channel, authorId, content, member) => {
     });
     await test('Confirm lần 2 bị chặn, doanh thu KHÔNG bị cộng thêm', async () => {
         const ticketCh = guild.channels.created.at(-1).ch;
-        const it = buttonInteraction({ customId: 'ticket_confirm_conf1', user: { id: SELLER }, member: staffMember(), channel: ticketCh });
+        const it = buttonInteraction({ customId: 'ticket_confirm_conf1', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh });
         await index.handleInteraction(it);
         assert.ok(lastText(it).includes('đã được xác nhận trước đó'));
         const me = (await db.getTopCustomers(10)).find(c => c._id === buyer1.id);
@@ -308,7 +309,7 @@ const msgFor = (channel, authorId, content, member) => {
         const ticketCh = guild.channels.created.at(-1).ch;
         const dmsBefore = buyer2.dms.length;
         await Promise.all([1, 2].map(() => index.handleInteraction(
-            buttonInteraction({ customId: 'ticket_confirm_conf2', user: { id: SELLER }, member: staffMember(), channel: ticketCh }))));
+            buttonInteraction({ customId: 'ticket_confirm_conf2', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }))));
         const me = (await db.getTopCustomers(10)).find(c => c._id === buyer2.id);
         assert.equal(me.totalOrders, 1); assert.equal(me.totalSpent, 190000);
         assert.equal(buyer2.dms.length - dmsBefore, 1);
@@ -324,13 +325,25 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal((await db.getAccount('conf3')).status, 'PROCESSING');
     });
 
+    await test('chỉ đúng CONFIRM_USER_ID được Confirm: Owner, Staff, Seller đều bị từ chối', async () => {
+        const { cardCh, cardMsg } = await seedAccount('conf4');
+        await buy('conf4', '800000000000000002', cardCh, cardMsg);
+        const ticketCh = guild.channels.created.at(-1).ch;
+        for (const id of [OWNER, SELLER]) {
+            const it = buttonInteraction({ customId: 'ticket_confirm_conf4', user: { id }, member: staffMember(), channel: ticketCh });
+            await index.handleInteraction(it);
+            assert.ok(lastText(it).includes('Từ chối'), `id ${id} phải bị từ chối`);
+        }
+        assert.equal((await db.getAccount('conf4')).status, 'PROCESSING');
+    });
+
     console.log('\n[6] DM thất bại: giữ thông tin, cho gửi lại, chặn đóng ticket');
     await test('DM lỗi -> delivery=pending, vẫn giữ credential, Close bị chặn, Gửi lại xong thì xóa', async () => {
         const buyer3 = makeUser('800000000000000003', { dmFails: true });
         const { cardCh, cardMsg } = await seedAccount('dm1');
         await buy('dm1', buyer3.id, cardCh, cardMsg);
         const ticketCh = guild.channels.created.at(-1).ch;
-        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_dm1', user: { id: SELLER }, member: staffMember(), channel: ticketCh }));
+        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_dm1', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }));
         assert.equal((await db.getTicket(ticketCh.id)).delivery, 'pending');
         assert.ok(await db.getAccountCredentials('dm1'), 'credential phải còn để gửi lại');
         const alerts = ticketCh.sent.filter(m => JSON.stringify(m).includes('LỖI KHI XỬ LÝ ĐƠN'));
@@ -407,6 +420,60 @@ const msgFor = (channel, authorId, content, member) => {
             assert.equal(acc.status, 'AVAILABLE'); assert.equal(acc.price, '150k');
             assert.ok(acc.cardMessageId, 'lưu id tin card để cập nhật SOLD sau này');
         } finally { cardRenderer.fetchBuffer = realFetch; }
+    });
+
+    await test('/stock acc: bắt buộc sotien + seller; tùy chọn rỗng = NON; ô riêng ưu tiên hơn nhapnhanh; credential được mã hóa', async () => {
+        const { ChannelType } = require('discord.js');
+        registry.set(STOCK_CAT, { id: STOCK_CAT, name: 'Stock', type: ChannelType.GuildCategory, guildId: 'G' });
+        const json = require(path.join(root, 'commands/stock')).data.toJSON();
+        const sub = json.options[0];
+        assert.equal(sub.name, 'acc');
+        const req = sub.options.filter(o => o.required).map(o => o.name);
+        assert.deepEqual(req, ['sotien', 'seller']);
+        const optNames = sub.options.filter(o => !o.required).map(o => o.name);
+        for (const n of ['kenh', 'nhapnhanh', 'username', 'primaryemail', 'recoverycode', 'securityemail', 'password', 'secretkey', 'capes', 'rank']) assert.ok(optNames.includes(n), 'thiếu ô ' + n);
+        assert.ok(!optNames.includes('statshpx') && !optNames.includes('statsdonut'));
+
+        const mk = (strings, sellerId = SELLER, kenh = null) => ({
+            isChatInputCommand: () => true, commandName: 'stock', user: { id: OWNER, bot: false }, member: makeMember(OWNER), client, guild, guildId: guild.id,
+            channelId: 'CUR', channel: makeChannel('lenh'), replies: [], edits: [], deferred: false,
+            options: { getSubcommand: () => 'acc', getString: (k) => strings[k] ?? null, getUser: () => ({ id: sellerId }), getBoolean: () => kenh },
+            async reply(x) { this.replies.push(x); }, async deferReply() { this.deferred = true; },
+            async editReply(x) { this.edits.push(x); return { id: 'M2', channelId: 'CUR' }; }, async followUp(x) { this.replies.push(x); }
+        });
+
+        // seller không phải Owner / Staff -> từ chối, không tạo kênh
+        const before = guild.channels.created.length;
+        const bad = mk({ sotien: '100k', username: 'stk1' }, '800000000000000077');
+        await index.handleInteraction(bad);
+        assert.ok(JSON.stringify(bad.edits).includes('không thể đứng bán'));
+        assert.equal(guild.channels.created.length, before);
+
+        // đủ thông tin: nhapnhanh + ô riêng (ô riêng thắng)
+        const it = mk({
+            sotien: '120k', username: 'stk1', password: 'RIENG',
+            nhapnhanh: 'Username: sai\nPassword: NHAPNHANH\nPrimary Email: a@b.c\nCapes: Migrator, Vanilla'
+        });
+        await index.handleInteraction(it);
+        assert.equal(guild.channels.created.length, before + 1, JSON.stringify(it.edits) + JSON.stringify(it.replies));
+        const { ch, opts } = guild.channels.created.at(-1);
+        assert.equal(opts.name, '✅・120k・2-cape');
+        const posted = ch.sent.at(-1);
+        assert.ok(JSON.stringify(posted.embeds[0].toJSON()).includes(`<@${SELLER}>`), 'Seller = người được chọn');
+        const acc = await db.getAccount('stk1');
+        assert.equal(acc.sellerId, SELLER); assert.equal(acc.rank, 'NON'); assert.equal(acc.hasCredentials, true);
+        const creds = await db.getAccountCredentials('stk1');
+        assert.equal(creds.password, 'RIENG'); assert.equal(creds.primaryEmail, 'a@b.c');
+        assert.ok(!JSON.stringify(it.edits).includes('RIENG') && !JSON.stringify(posted).includes('RIENG'), 'không lộ mật khẩu');
+
+        // bỏ trống username: card hiện NON, mã acc riêng; kenh=false thì đăng ngay kênh đang gõ lệnh
+        const n = guild.channels.created.length;
+        const it2 = mk({ sotien: '50k' }, SELLER, false);
+        await index.handleInteraction(it2);
+        assert.equal(guild.channels.created.length, n, 'kenh=false không tạo kênh');
+        const key = JSON.stringify(it2.edits.at(-1).components).match(/buy_acc_(non[0-9a-f]{6})/)?.[1];
+        assert.ok(key, 'mã acc non******');
+        assert.equal((await db.getAccount(key)).rank, 'NON');
     });
 
     await test('.setqr: Owner cài / xem VietQR hộ người khác, người thường bị từ chối, sai cú pháp báo rõ', async () => {
@@ -571,7 +638,7 @@ const msgFor = (channel, authorId, content, member) => {
         const { cardCh, cardMsg } = await seedAccount('auto1');
         await buy('auto1', buyer.id, cardCh, cardMsg);
         const ticketCh = guild.channels.created.at(-1).ch;
-        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_auto1', user: { id: SELLER }, member: staffMember(), channel: ticketCh }));
+        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_auto1', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }));
 
         for (const text of ['shop này legit không?', '+1 legit mfa', 'vouch nhé']) {
             await index.handleMessage(msgFor(ticketCh, buyer.id, text));
@@ -595,7 +662,7 @@ const msgFor = (channel, authorId, content, member) => {
         await db.wipeCredentials('manual1');
         await buy('manual1', buyer.id, cardCh, cardMsg);
         const ticketCh = guild.channels.created.at(-1).ch;
-        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_manual1', user: { id: SELLER }, member: staffMember(), channel: ticketCh }));
+        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_manual1', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }));
         assert.equal((await db.getTicket(ticketCh.id)).delivery, 'manual');
         await index.handleMessage(msgFor(ticketCh, buyer.id, 'legit không shop?'));
         assert.ok(await db.getTicket(ticketCh.id));
@@ -605,7 +672,7 @@ const msgFor = (channel, authorId, content, member) => {
         const { cardCh, cardMsg } = await seedAccount('force1');
         await buy('force1', buyer.id, cardCh, cardMsg);
         const ticketCh = guild.channels.created.at(-1).ch;
-        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_force1', user: { id: SELLER }, member: staffMember(), channel: ticketCh }));
+        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_force1', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }));
         await index.handleMessage(msgFor(ticketCh, SELLER, '.close', staffMember()));
         assert.ok(await db.getTicket(ticketCh.id), 'staff bị chặn');
         await index.handleMessage(msgFor(ticketCh, OWNER, '.close', makeMember(OWNER)));
@@ -689,7 +756,7 @@ const msgFor = (channel, authorId, content, member) => {
         const { cardCh, cardMsg } = await seedAccount('rem0');
         await buy('rem0', buyer.id, cardCh, cardMsg);
         const ticketCh = guild.channels.created.at(-1).ch;
-        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_rem0', user: { id: SELLER }, member: staffMember(), channel: ticketCh }));
+        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_rem0', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }));
         const col = FakeMongoClient.last.db('autobuy').collection('reminders');
         assert.ok(col.docs.some(d => d.buyerId === buyer.id));
         await index.handleMessage(msgFor(registry.get(LEGIT_CH), buyer.id, `+1 legit <@${SELLER}> mfa`));
@@ -913,7 +980,7 @@ const msgFor = (channel, authorId, content, member) => {
         const { cardCh, cardMsg } = await seedAccount('done1');
         await buy('done1', buyer.id, cardCh, cardMsg);
         const ticketCh = guild.channels.created.at(-1).ch;
-        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_done1', user: { id: SELLER }, member: staffMember(), channel: ticketCh }));
+        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_done1', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }));
         const mk = (channelId) => ({
             member: staffMember(), channelId, client, user: { id: SELLER, username: 's', displayAvatarURL: () => null }, replies: [],
             options: { getUser: () => ({ id: '800000000000000050' }), getString: () => '1.500.000đ', getInteger: () => null },
@@ -933,7 +1000,7 @@ const msgFor = (channel, authorId, content, member) => {
         const { cardCh, cardMsg } = await seedAccount('done2');
         await buy('done2', buyer.id, cardCh, cardMsg);
         const ticketCh = guild.channels.created.at(-1).ch;
-        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_done2', user: { id: SELLER }, member: staffMember(), channel: ticketCh }));
+        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_done2', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }));
         await db.updateTicket(ticketCh.id, { revenueRecorded: false });   // giả lập: Confirm đã khóa đơn nhưng chưa ghi được doanh thu
         const CUST = '800000000000000051';
         const mk = () => ({
@@ -959,7 +1026,7 @@ const msgFor = (channel, authorId, content, member) => {
         await done.execute(it);
         assert.equal((await db.getTopCustomers(50)).find(c => c._id === CUST).totalSpent, 300000);
         const before = (await db.getTopCustomers(50)).find(c => c._id === buyer.id)?.totalSpent || 0;
-        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_done3', user: { id: SELLER }, member: staffMember(), channel: ticketCh }));
+        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_done3', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }));
         const after = (await db.getTopCustomers(50)).find(c => c._id === buyer.id)?.totalSpent || 0;
         assert.equal(after, before, 'Confirm sau /done không cộng thêm lần nữa');
     });
@@ -1021,7 +1088,7 @@ const msgFor = (channel, authorId, content, member) => {
         const { cardCh, cardMsg } = await seedAccount('done4');
         await buy('done4', buyer.id, cardCh, cardMsg);
         const ticketCh = guild.channels.created.at(-1).ch;
-        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_done4', user: { id: SELLER }, member: staffMember(), channel: ticketCh }));
+        await index.handleInteraction(buttonInteraction({ customId: 'ticket_confirm_done4', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh }));
         const m = msgFor(ticketCh, SELLER, '.done <@800000000000000055> 100k', staffMember());
         await index.handleMessage(m);
         assert.ok(JSON.stringify(m.replies).includes('đã được ghi'));
@@ -1065,7 +1132,7 @@ const msgFor = (channel, authorId, content, member) => {
 
         const original = db.recordCustomerPurchase;
         db.recordCustomerPurchase = async () => { throw new Error('mongo down'); };
-        const it = buttonInteraction({ customId: 'ticket_confirm_crash1', user: { id: SELLER }, member: staffMember(), channel: ticketCh });
+        const it = buttonInteraction({ customId: 'ticket_confirm_crash1', user: { id: C.CONFIRM_USER_ID }, member: staffMember(), channel: ticketCh });
         await index.handleInteraction(it);
         db.recordCustomerPurchase = original;
 

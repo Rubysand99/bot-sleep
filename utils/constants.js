@@ -5,6 +5,9 @@ const fromEnv = (name, fallback) => {
 };
 
 module.exports = {
+    // Người DUY NHẤT được bấm nút Confirm (xác nhận đơn). Đơn payOS tự nhận tiền thì bot tự xác nhận, không cần người này.
+    CONFIRM_USER_ID: fromEnv('CONFIRM_USER_ID', '1473293264613277798'),
+
     // Kênh mặc định: bill + khối Note của bill. Chỉ dùng khi biến môi trường / lệnh /config CHƯA đặt,
     // và chỉ nhận nếu kênh đó thật sự nằm trong server đang xử lý (server khác không bao giờ "mượn" kênh này).
     DEFAULT_CHANNELS: {

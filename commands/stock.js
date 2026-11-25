@@ -19,14 +19,24 @@ const emojis = require('../utils/emojis');
 const { checkStaffOrOwner } = require('../utils/permissions');
 const { cfg } = require('../utils/runtime');
 const { buildStockNote } = require('../utils/stockNote');
+const { parseAccountFields } = require('../utils/accountForm');
+const crypto = require('crypto');
 
-function countCapes(capesText) {
-    if (!capesText) return 0;
-    const customEmojis = capesText.match(/<(?:a)?:[a-zA-Z0-9_]+:[0-9]+>/g) || [];
-    if (customEmojis.length > 0) return customEmojis.length;
-    const unicodeEmojis = capesText.match(/\p{Extended_Pictographic}/gu) || [];
-    return unicodeEmojis.length;
+const EMOJI_RE = /<(?:a)?:[a-zA-Z0-9_]+:[0-9]+>/g;
+const NON = 'NON';
+
+// Cape nhập cách nhau bằng dấu phẩy (emoji hoặc tên). Trả về { text (lưu DB, '' nếu trống), emojis (vẽ lên card), count }
+function parseCapes(raw) {
+    const text = String(raw || '').trim();
+    if (!text || text.toUpperCase() === NON) return { text: '', emojis: [], count: 0 };
+    const emojis = Array.from(new Set(text.match(EMOJI_RE) || []));
+    if (emojis.length) return { text: emojis.join(' '), emojis, count: emojis.length };
+    const names = text.split(/[,\n]+/).map(x => x.trim()).filter(Boolean);
+    return { text: names.join(', '), emojis: [], count: names.length };
 }
+
+// Ô nhập riêng luôn được ưu tiên hơn nhapnhanh; trống cả hai thì ''
+const pick = (own, quick) => (String(own || '').trim() || String(quick || '').trim());
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -35,31 +45,21 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('acc')
-                .setDescription('Đăng bán card tài khoản Minecraft kèm nút Buy')
-                .addStringOption(option =>
-                    option.setName('username')
-                        .setDescription('Tên tài khoản Minecraft')
-                        .setRequired(true))
-                .addStringOption(option =>
-                    option.setName('price')
-                        .setDescription('Giá bán (vd: 100k, 140000, 1.2M)')
-                        .setRequired(true))
-                .addStringOption(option =>
-                    option.setName('capes')
-                        .setDescription('Emoji capes (nếu để trống sẽ tự lấy từ kho nếu đã add_acc)')
-                        .setRequired(false))
-                .addStringOption(option =>
-                    option.setName('rank')
-                        .setDescription('Rank Hypixel (vd: VIP, MVP, MVP+, NON)')
-                        .setRequired(false))
-                .addStringOption(option =>
-                    option.setName('statshpx')
-                        .setDescription('Stats Hypixel: Level, Achievements (vd: 150, 4500)')
-                        .setRequired(false))
-                .addStringOption(option =>
-                    option.setName('statsdonut')
-                        .setDescription('Stats DonutSMP: Playtime, Money, Shards (vd: 120h, 50M, 1500)')
-                        .setRequired(false))
+                .setDescription('Đăng bán tài khoản Minecraft và tùy chọn tạo kênh')
+                // 2 giá trị bắt buộc
+                .addStringOption(o => o.setName('sotien').setDescription('Số tiền bán (vd: 100k, 140000, 1.2M)').setRequired(true))
+                .addUserOption(o => o.setName('seller').setDescription('Người bán (Owner, Staff hoặc Seller)').setRequired(true))
+                // Tùy chọn
+                .addBooleanOption(o => o.setName('kenh').setDescription('Tạo kênh mới theo giá trong danh mục Kho stock (mặc định: có)'))
+                .addStringOption(o => o.setName('nhapnhanh').setDescription('Dán thông tin một tài khoản; ô nhập riêng được ưu tiên'))
+                .addStringOption(o => o.setName('username').setDescription('Username Minecraft; bỏ trống là NON'))
+                .addStringOption(o => o.setName('primaryemail').setDescription('Primary Email; bỏ trống là NON'))
+                .addStringOption(o => o.setName('recoverycode').setDescription('Recovery Code; bỏ trống là NON'))
+                .addStringOption(o => o.setName('securityemail').setDescription('Security Email; bỏ trống là NON'))
+                .addStringOption(o => o.setName('password').setDescription('Password; bỏ trống là NON'))
+                .addStringOption(o => o.setName('secretkey').setDescription('Secret Key; bỏ trống là NON'))
+                .addStringOption(o => o.setName('capes').setDescription('Danh sách cape, cách nhau bằng dấu phẩy; bỏ trống là NON'))
+                .addStringOption(o => o.setName('rank').setDescription('Rank; bỏ trống là NON'))
         ),
 
     resolveStockTarget,
@@ -84,53 +84,63 @@ async function runStock(interaction) {
         }
 
         try {
-            const username = interaction.options.getString('username').trim();
-            const price = interaction.options.getString('price').trim();
-            let rawRank = interaction.options.getString('rank') || '';
-            let rawCapes = interaction.options.getString('capes') || '';
-            let statshpx = interaction.options.getString('statshpx') || '';
-            let statsdonut = interaction.options.getString('statsdonut') || '';
+            const opt = (name) => interaction.options.getString(name) || '';
+            const price = opt('sotien').trim();
+            const sellerUser = interaction.options.getUser('seller');
+            const createChannel = interaction.options.getBoolean('kenh') !== false;
 
-            const storedAcc = await db.getAccount(username);
+            // Seller phải là Owner / Staff của server này
+            const sellerMember = await interaction.guild.members.fetch(sellerUser.id).catch(() => null);
+            if (!checkStaffOrOwner(sellerMember)) {
+                return await interaction.editReply({
+                    content: `❌ <@${sellerUser.id}> không phải Owner / Staff / Seller nên không thể đứng bán!`
+                });
+            }
+            const sellerId = sellerUser.id;
+
+            // Thông tin tài khoản: ô nhập riêng > nhapnhanh
+            const quick = parseAccountFields(opt('nhapnhanh'));
+            const typedName = pick(opt('username'), quick.username);
+            const hasName = Boolean(typedName) && typedName.toUpperCase() !== NON;
+            // Không có username thì hiện NON trên card, nhưng cần mã riêng để nút Buy / kho không bị trùng giữa các acc
+            const username = hasName ? typedName : NON;
+            const accountKey = hasName ? typedName : `non${crypto.randomBytes(3).toString('hex')}`;
+
+            const credentials = {
+                primaryEmail: pick(opt('primaryemail'), quick.credentials.primaryEmail),
+                recoveryCode: pick(opt('recoverycode'), quick.credentials.recoveryCode),
+                securityEmail: pick(opt('securityemail'), quick.credentials.securityEmail),
+                password: pick(opt('password'), quick.credentials.password),
+                secretKey: pick(opt('secretkey'), quick.credentials.secretKey)
+            };
+            for (const k of Object.keys(credentials)) if (credentials[k].toUpperCase() === NON) credentials[k] = '';
+            const hasCredentialsNow = Object.values(credentials).some(Boolean);
+
+            const storedAcc = await db.getAccount(accountKey);
             if (storedAcc?.status === 'PROCESSING') {
                 return await interaction.editReply({
                     content: '⏳ Tài khoản này đang có đơn giao dịch, không thể đăng lại card lúc này!'
                 });
             }
 
-            // Xác định ID người đăng bán (Seller)
-            const sellerId = storedAcc?.sellerId || interaction.user.id;
+            // Tách các emoji nếu người dùng vô tình dán vào ô rank
+            const rawRank = pick(opt('rank'), quick.rank);
+            const rankEmojis = (rawRank.match(EMOJI_RE) || []).join(' ');
+            const rank = rawRank.replace(EMOJI_RE, '').trim() || NON;
 
-            // Tách các emoji nếu người dùng vô tình dán vào ô rank/stats
-            const emojiRegex = /<(?:a)?:[a-zA-Z0-9_]+:[0-9]+>/g;
-            const rankEmojis = (rawRank.match(emojiRegex) || []).join(' ');
-            const hpxEmojis = (statshpx.match(emojiRegex) || []).join(' ');
-            const donutEmojis = (statsdonut.match(emojiRegex) || []).join(' ');
-
-            let rank = rawRank.replace(emojiRegex, '').trim() || 'NON';
-            statshpx = statshpx.replace(emojiRegex, '').trim();
-            statsdonut = statsdonut.replace(emojiRegex, '').trim();
-
-            // Xác định capes
-            let capes = rawCapes.trim();
-            if (!capes && storedAcc && storedAcc.capes) {
-                capes = storedAcc.capes.trim();
-            }
-            if (!capes) {
-                capes = `${rankEmojis} ${hpxEmojis} ${donutEmojis}`.trim();
-            }
-
-            const foundEmojis = capes.match(emojiRegex) || [];
-            const uniqueCapes = Array.from(new Set(foundEmojis));
-            capes = uniqueCapes.join(' ');
+            // Capes: ô riêng > nhapnhanh > cape đã lưu trong kho > emoji lẫn trong rank
+            let capesInfo = parseCapes(pick(opt('capes'), quick.capes));
+            if (!capesInfo.count && storedAcc?.capes) capesInfo = parseCapes(storedAcc.capes);
+            if (!capesInfo.count && rankEmojis) capesInfo = parseCapes(rankEmojis);
+            const capes = capesInfo.text;
 
             const imageBuffer = await renderCard({
                 username,
                 price,
                 rank,
                 capes,
-                statshpx,
-                statsdonut
+                statshpx: '',
+                statsdonut: ''
             });
 
             if (!imageBuffer) {
@@ -139,7 +149,10 @@ async function runStock(interaction) {
 
             // Lưu tài khoản TRƯỚC khi đăng card. Nếu giữa chừng có người vừa mở đơn (PROCESSING) thì dừng,
             // không bao giờ ghi đè trạng thái đang giao dịch về AVAILABLE.
-            const saved = await db.upsertAccount({ username, price, rank, capes, sellerId, status: 'AVAILABLE' });
+            const saved = await db.upsertAccount(
+                { username: accountKey, price, rank, capes, sellerId, status: 'AVAILABLE' },
+                hasCredentialsNow ? credentials : null
+            );
             if (!saved) {
                 return await interaction.editReply({
                     content: '⏳ Tài khoản này vừa có người mở đơn giao dịch, không thể đăng lại card lúc này!'
@@ -158,13 +171,13 @@ async function runStock(interaction) {
                 .setImage('attachment://card.png')
                 .setColor('#2b2d31');
 
-            const row = buildCardRow('available', username, interaction.guildId);
+            const row = buildCardRow('available', accountKey, interaction.guildId);
 
-            const capeCount = countCapes(capes);
+            const capeCount = capesInfo.count;
             const priceDisplay = formatPriceDisplay(price);
 
             // Xác định vị trí đăng (danh mục STOCK_ID: tạo kênh mới theo giá; kênh: đăng thẳng; chưa đặt: đăng tại chỗ)
-            const { targetChannel, isDifferentChannel } = await resolveStockTarget(interaction, `✅・${priceDisplay}・${capeCount}-cape`);
+            const { targetChannel, isDifferentChannel } = await resolveStockTarget(interaction, `✅・${priceDisplay}・${capeCount}-cape`, { createChannel });
 
             let replyMessage;
             if (isDifferentChannel) {
@@ -175,7 +188,7 @@ async function runStock(interaction) {
                 });
 
                 await interaction.editReply({
-                    content: `✅ **Đã tạo kênh và đăng card \`${username}\` thành công!** Xem tại: <#${targetChannel.id}>`
+                    content: `✅ **Đã tạo kênh và đăng card \`${accountKey}\` thành công!** Xem tại: <#${targetChannel.id}>`
                 });
             } else {
                 replyMessage = await interaction.editReply({ 
@@ -186,15 +199,21 @@ async function runStock(interaction) {
             }
 
             // Cập nhật thông tin vào DB
-            await db.updateAccount(username, {
+            await db.updateAccount(accountKey, {
                 cardMessageId: replyMessage.id,
                 cardChannelId: replyMessage.channelId
             });
 
-            if (!storedAcc || !storedAcc.hasCredentials) {
+            if (!hasCredentialsNow && !storedAcc?.hasCredentials) {
                 await interaction.followUp({
-                    content: '⚠️ Tài khoản này **chưa có thông tin đăng nhập** trong kho (hoặc đã được xóa sau lần bán trước). ' +
-                             'Hãy dùng `/add_acc` để nạp, nếu không khi khách mua bot sẽ không tự gửi DM được.',
+                    content: '⚠️ Tài khoản này **chưa có thông tin đăng nhập** trong kho. ' +
+                             'Hãy nhập thêm `password`, `primaryemail`... (hoặc dùng `/add_acc`), nếu không khi khách mua bot sẽ không tự gửi DM được.' +
+                             (hasName ? '' : `\nMã acc trong kho: \`${accountKey}\` (card hiện NON).`),
+                    flags: MessageFlags.Ephemeral
+                }).catch(() => null);
+            } else if (!hasName) {
+                await interaction.followUp({
+                    content: `ℹ️ Mã acc trong kho: \`${accountKey}\` (card hiện NON).`,
                     flags: MessageFlags.Ephemeral
                 }).catch(() => null);
             }
@@ -209,8 +228,9 @@ async function runStock(interaction) {
 }
 
 // Tìm nơi đăng card theo STOCK_ID. Dùng chung cho /stock acc và /dang_anh.
+// createChannel=false: danh mục STOCK_ID không tạo kênh mới, đăng ngay tại kênh đang gõ lệnh.
 // Trả về { targetChannel, isDifferentChannel }; channelName = tên kênh nếu STOCK_ID là danh mục (sẽ tạo kênh mới).
-async function resolveStockTarget(interaction, channelName) {
+async function resolveStockTarget(interaction, channelName, { createChannel = true } = {}) {
     const ownerId = process.env.OWNER_ID;
     const staffRoleId = cfg('STAFF_ROLE_ID', interaction.guild);
     const stockId = cfg('STOCK_ID', interaction.guild);
@@ -227,7 +247,7 @@ async function resolveStockTarget(interaction, channelName) {
                 if (target.type === ChannelType.GuildText || target.type === ChannelType.GuildAnnouncement) {
                     targetChannel = target;
                     isDifferentChannel = (targetChannel.id !== interaction.channelId);
-                } else if (target.type === ChannelType.GuildCategory) {
+                } else if (target.type === ChannelType.GuildCategory && createChannel) {
                     
                     const permissionOverwrites = [
                         {

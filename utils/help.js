@@ -36,7 +36,7 @@ function buildHelpEmbed(member) {
         ]);
         const slash = pick([
             ['autobuy', '`/add_acc`: mở form dán thông tin tài khoản vào kho (bot mã hóa mật khẩu).'],
-            ['autobuy', '`/stock acc username price`: đăng card bán kèm nút BUY (tùy chọn: capes, rank, statshpx, statsdonut).'],
+            ['autobuy', '`/stock acc sotien seller`: đăng card bán kèm nút BUY (thêm: nhapnhanh, capes, rank...).'],
             ['autobuy', '`/set_qr bank_name account_number bank_type`: cài ngân hàng tạo VietQR (người thường: Owner xác nhận qua DM).'],
             ['autobuy', '`/payos set|xem|kiem_tra|xoa`: kênh payOS riêng, bot tự nhận tiền và giao acc.'],
             ['autobuy', '`/restock`: đăng danh sách các kênh đang còn hàng.'],
