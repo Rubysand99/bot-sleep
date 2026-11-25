@@ -560,6 +560,12 @@ async function handleBuyInner(interaction) {
         let payosQrBuf = null;
         let payosFailed = false;
         const payosCreds = await payosCredsFor(targetSellerId).catch(() => null);
+        if (!payosCreds) {
+            log.debug('PAYOS', 'Không dùng payOS cho đơn này', {
+                nguoiBan: targetSellerId,
+                lyDo: String(targetSellerId) !== String(ownerId || '').trim() ? 'người bán không phải Owner' : 'chưa cấu hình PAYOS_* trong env'
+            });
+        }
         if (payosCreds && numericAmount > 0) {
             try {
                 const expireMin = parseInt(process.env.PAYOS_EXPIRE_MIN, 10) || 30;
@@ -569,6 +575,7 @@ async function handleBuyInner(interaction) {
                 });
                 payosQrBuf = await payos.qrToPng(link.qrCode);
                 payosLink = link;
+                log.info('PAYOS', 'Đã tạo link payOS cho đơn', { ticket: ticketChannel.id, orderCode: link.orderCode, soTien: numericAmount });
             } catch (err) {
                 payosFailed = true;
                 log.error('PAYOS', 'Tạo link payOS THẤT BẠI, dùng VietQR + Confirm tay', { nguoiBan: targetSellerId, loi: err.message });
@@ -1921,6 +1928,7 @@ client.once(Events.ClientReady || 'ready', async () => {
     if (profile.has('legit')) await scanLegitChannels().catch(err => console.error('[LỖI QUÉT LEGIT]:', err));
     if (profile.has('bxh')) await refreshLeaderboardMessage(client).catch(() => null);   // bảng xếp hạng luôn khớp dữ liệu sau mỗi lần khởi động
     if (profile.has('autobuy')) setInterval(() => runQrRequests().catch(err => console.error('[Lỗi quét yêu cầu QR]:', err.message)), 60_000);
+    if (profile.has('autobuy')) log.info('PAYOS', process.env.PAYOS_CLIENT_ID && process.env.PAYOS_API_KEY && process.env.PAYOS_CHECKSUM_KEY ? 'payOS BẬT (chỉ đơn của Owner), quét mỗi vài giây' : 'payOS TẮT (thiếu PAYOS_* trong env), dùng VietQR + Confirm tay');
     if (profile.has('autobuy')) setInterval(() => runPayosChecks().catch(err => console.error('[Lỗi quét payOS]:', err.message)), Math.max(3, parseInt(process.env.PAYOS_POLL_SEC, 10) || 5) * 1000);
     if (profile.has('autobuy')) setInterval(() => runVouchReminders().catch(err => console.error('[Lỗi quét nhắc vouch]:', err.message)), 60_000);
 });
