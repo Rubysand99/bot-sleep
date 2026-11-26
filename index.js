@@ -1789,22 +1789,30 @@ async function handleMessageInner(message) {
             if (!checkStaffOrOwner(message.member)) {
                 return await message.reply({ content: '❌ Lệnh `.tien` chỉ dành cho Staff hoặc Owner!' }).catch(() => null);
             }
-            const usage = '⚠️ **Cú pháp:** `.tien @user +100k` (cộng) hoặc `.tien @user -50k` (trừ)';
+            const usage = '⚠️ **Cú pháp:** `.tien @user 500k` (đặt số tiền), `.tien @user +100k` (cộng) hoặc `.tien @user -50k` (trừ)';
             const parts = message.content.trim().split(/\s+/).slice(1);
             const um = (parts[0] || '').match(/^<@!?(\d{17,20})>$/) || (parts[0] || '').match(/^(\d{17,20})$/);
-            const sm = (parts[1] || '').match(/^([+-])(.+)$/);
+            const sm = (parts[1] || '').match(/^([+-]?)(.+)$/);
             if (!um || !sm) return await message.reply({ content: usage }).catch(() => null);
             const amount = parseAmount(sm[2]);
-            if (amount <= 0) return await message.reply({ content: '❌ Số tiền không hợp lệ!' }).catch(() => null);
+            const isSet = !sm[1];
+            if (amount < 0 || (amount === 0 && !isSet) || !/\d/.test(sm[2])) return await message.reply({ content: '❌ Số tiền không hợp lệ!' }).catch(() => null);
             const maxAmount = parseInt(process.env.DONE_MAX_AMOUNT, 10) || 100_000_000;
             if (amount > maxAmount) return await message.reply({ content: `❌ Số tiền vượt mức tối đa ${formatVND(maxAmount)} cho một lần (nghi gõ thừa số 0).` }).catch(() => null);
             const sign = sm[1] === '-' ? -1 : 1;
-            const { before, after } = await db.adjustCustomerTotal(um[1], sign * amount);
-            log.info('TIEN', sign > 0 ? 'Cộng tiền' : 'Trừ tiền', { customerId: um[1], amount, truoc: before, sau: after, by: message.author.id });
+            let before, after;
+            if (isSet) {
+                before = (await db.getCustomer(um[1]))?.totalSpent ?? 0;
+                await db.setCustomerTotal(um[1], amount);
+                after = amount;
+            } else {
+                ({ before, after } = await db.adjustCustomerTotal(um[1], sign * amount));
+            }
+            log.info('TIEN', isSet ? 'Đặt tiền' : sign > 0 ? 'Cộng tiền' : 'Trừ tiền', { customerId: um[1], amount, truoc: before, sau: after, by: message.author.id });
             const lines = client ? milestones.summaryLines(
                 await milestones.applyMilestones(client, um[1], after, { reason: 'lệnh tien' }).catch(() => []), formatVND) : [];
             await message.reply({
-                content: `${sign > 0 ? '➕ Đã cộng' : '➖ Đã trừ'} **${formatVND(amount)}** cho <@${um[1]}>\n> 💵 Tổng chi tiêu: ${formatVND(before)} → **${formatVND(after)}**` +
+                content: `${isSet ? '✏️ Đã đặt tổng chi tiêu của' : `${sign > 0 ? '➕ Đã cộng' : '➖ Đã trừ'} **${formatVND(amount)}** cho`} <@${um[1]}>\n> 💵 Tổng chi tiêu: ${formatVND(before)} → **${formatVND(after)}**` +
                     (sign < 0 && after === 0 && before < amount ? '\n⚠️ Số trừ lớn hơn tổng hiện có nên đã về 0.' : '') +
                     (lines.length ? `\n${lines.join('\n')}` : ''),
                 allowedMentions: { parse: [] }

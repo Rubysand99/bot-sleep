@@ -1202,11 +1202,17 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal(await tot(), 150000);
         await index.handleMessage(msgFor(here, SELLER, `.tien <@${CUST}> -1M`, staffMember()));
         assert.equal(await tot(), 0, 'trừ quá số có thì về 0, không âm');
+        await index.handleMessage(msgFor(here, SELLER, `.tien ${CUST} 500k`, staffMember()));
+        assert.equal(await tot(), 500000, 'không dấu = đặt số tiền');
+        await index.handleMessage(msgFor(here, SELLER, `.tien <@${CUST}> 120k`, staffMember()));
+        assert.equal(await tot(), 120000, 'đặt lại ghi đè, không cộng dồn');
+        await index.handleMessage(msgFor(here, SELLER, `.tien <@${CUST}> 0`, staffMember()));
+        assert.equal(await tot(), 0);
         const guest = msgFor(here, '800000000000000001', `.tien <@${CUST}> +1M`);
         await index.handleMessage(guest);
         assert.ok(JSON.stringify(guest.replies).includes('Staff'));
         assert.equal(await tot(), 0);
-        for (const bad of ['.tien', `.tien <@${CUST}>`, `.tien <@${CUST}> 50k`, '.tien abc +50k']) {
+        for (const bad of ['.tien', `.tien <@${CUST}>`, '.tien abc +50k']) {
             const b = msgFor(here, SELLER, bad, staffMember());
             await index.handleMessage(b);
             assert.ok(JSON.stringify(b.replies).includes('Cú pháp'), bad);

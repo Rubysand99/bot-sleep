@@ -128,7 +128,7 @@ Bot cần quyền **Manage Roles** và role của bot phải nằm **cao hơn** 
 | `.av [@user \| id]` | mọi người | xem avatar |
 | `.vietqr <số tiền> [ghi chú]` | Staff/Owner | tạo mã VietQR nhanh |
 | `sold` (không có dấu chấm) | Staff/Owner (người tạo acc hoặc Owner) | đánh dấu kênh bán hàng đã bán ngoài hệ thống |
-| `.tien <@user \| id> +số / -số` | Staff/Owner | cộng (+) hoặc trừ (-) tiền trong tổng chi tiêu của khách, vd `.tien @user -50k` (không âm) |
+| `.tien <@user \| id> số / +số / -số` | Staff/Owner | đặt (không dấu), cộng (+) hoặc trừ (-) tiền trong tổng chi tiêu của khách, vd `.tien @user -50k` (không âm) |
 | `.done <@khách \| id> <số tiền> [số đơn]` | Staff/Owner | ghi doanh thu cho khách, cập nhật bảng xếp hạng (chống cộng trùng trong ticket) |
 | `.taokenh <tên>` (hoặc `taokenh <tên>`) | Staff/Owner | tạo kênh mới `✅・tên`; bot hiện menu để chọn danh mục |
 | `.xoakenh #kênh \| <id>` (hoặc `xoakenh ...`) | Staff/Owner | xóa kênh (chặn kênh hệ thống trong `/config` và card còn hàng / đang có đơn) |
