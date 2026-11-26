@@ -90,10 +90,21 @@ t('resolveInput: từ chối emoji bot không thấy, tên không tồn tại, v
 });
 t('mọi vị trí emoji đều có tên, nhãn và emoji thường dự phòng', () => {
     const m = load();
-    assert.deepStrictEqual(m.SLOTS.map(s => s.key), ['online', 'offline', 'info', 'legit1', 'legit2', 'legit3']);
+    assert.deepStrictEqual(m.SLOTS.map(s => s.key), ['online', 'offline', 'info', 'legit1', 'legit2', 'legit3', 'legit4', 'legit5']);
     for (const s of m.SLOTS) {
         assert.ok(s.label);
         assert.strictEqual(m.parseEmoji(m.effective(s.key, 'G1').value) !== null, true, s.key);
     }
 });
-console.log(`\n${pass}/8 kiểm thử emoji theo server đạt`);
+t('Zin Yeah Store (cartone): đúng 5 emoji legit theo thứ tự; drew giữ 3', () => {
+    process.env.BOT_PROFILE = 'cartone';
+    const m = load();
+    assert.deepStrictEqual(m.legitConfigured('G1').map(e => m.parseEmoji(e).id),
+        ['1519460742443569293', '1534924144431337644', '1556987442869964911', '1507043298198556723', '1544237808582131762']);
+    assert.strictEqual(new Set([0, 1, 2, 3, 4].map(i => m.reactionChain(i, 'G1').at(-1))).size, 5, 'emoji thường dự phòng không trùng');
+    process.env.BOT_PROFILE = 'drew';
+    assert.strictEqual(m.legitConfigured('G1').length, 3);
+    assert.strictEqual(m.activeSlots().length, 6);
+    delete process.env.BOT_PROFILE;
+});
+console.log(`\n${pass}/9 kiểm thử emoji theo server đạt`);

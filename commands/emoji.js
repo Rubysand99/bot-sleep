@@ -3,7 +3,7 @@ const { isOwnerId } = require('../utils/permissions');
 const { setEmojiSlot } = require('../utils/config');
 const emojis = require('../utils/emojis');
 
-const slotChoices = emojis.SLOTS.map(s => ({ name: `${s.key} · ${s.label}`.slice(0, 100), value: s.key }));
+const slotChoices = emojis.activeSlots().map(s => ({ name: `${s.key} · ${s.label}`.slice(0, 100), value: s.key }));
 const EPHEMERAL = MessageFlags.Ephemeral;
 const SRC = { server: 'đặt bằng `/emoji set`', mac_dinh: 'mặc định của bot' };
 
@@ -45,7 +45,7 @@ module.exports = {
         const gid = interaction.guildId;
 
         if (sub === 'check') {
-            const rows = emojis.SLOTS.map(s => describeSlot(interaction.client, s, gid));
+            const rows = emojis.activeSlots().map(s => describeSlot(interaction.client, s, gid));
             const bad = rows.filter(r => !r.ok).length;
             const plain = rows.filter(r => r.unicode).length;
             const me = interaction.guild?.members?.me;

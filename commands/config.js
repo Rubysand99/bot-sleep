@@ -21,7 +21,7 @@ module.exports = {
         .addSubcommand(sub => sub.setName('clear').setDescription('Xóa cài đặt của một mục trong server này')
             .addStringOption(o => o.setName('muc').setDescription('Mục cần xóa').setRequired(true).addChoices(...choices)))
         .addSubcommand(sub => sub.setName('show').setDescription('Xem cấu hình của server này'))
-        .addSubcommand(sub => sub.setName('check_emoji').setDescription('Kiểm tra 3 emoji legit và quyền của bot trong kênh legit'))
+        .addSubcommand(sub => sub.setName('check_emoji').setDescription('Kiểm tra các emoji legit và quyền của bot trong kênh legit'))
         .addSubcommand(sub => sub.setName('debug').setDescription('Chẩn đoán server này: kênh legit, quyền, emoji, role mốc và hoạt động legit gần nhất'))
         .addSubcommand(sub => sub.setName('legit_dem').setDescription('Bật / tắt đếm số legit cho server này (tắt = chỉ react emoji)')
             .addStringOption(o => o.setName('trangthai').setDescription('Bật hay tắt đếm số legit').setRequired(true)

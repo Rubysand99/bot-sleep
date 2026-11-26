@@ -2,6 +2,9 @@
 
 Mỗi bản cập nhật / sửa lỗi thêm 1 mục "## ..." Ở TRÊN CÙNG (mới nhất ở trên). Khi bot khởi động bản mới (version tự tăng), bot gửi embed các mục chưa thông báo vào kênh thông báo.
 
+## 26/11 · Bot Zin Yeah Store thả 5 emoji legit
+- Bot Zin Yeah Store react tin legit bằng 5 emoji theo đúng thứ tự mới (thêm vị trí `legit4`, `legit5` trong `/emoji`). Bot Drew giữ nguyên 3 emoji.
+
 ## 26/11 · Nhân vật xoay trong GIF stock
 - Nhân vật Minecraft trong GIF stock giờ xoay đủ 1 vòng (vẽ 3D từ file skin), bỏ vệt sáng. Không tải được skin thì dùng ảnh tĩnh như cũ.
 

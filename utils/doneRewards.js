@@ -1,6 +1,6 @@
 // Phần thưởng sau khi ghi 1 đơn (nút Confirm hoặc .done / /done):
 //  1. Tặng role DONE_ROLE_ID cho khách (đã có role thì bỏ qua, không làm gì).
-//  2. Thả emoji vào tin legit mới nhất của khách trong kênh legit: 3 emoji legit + emoji tiền.
+//  2. Thả emoji vào tin legit mới nhất của khách trong kênh legit: các emoji legit + emoji tiền.
 // Mọi lỗi đều được bắt và trả về dạng trạng thái, không bao giờ làm hỏng việc ghi doanh thu.
 const C = require('./constants');
 const db = require('./db');

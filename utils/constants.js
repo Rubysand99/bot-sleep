@@ -39,6 +39,15 @@ module.exports = {
         '<a:CanhXanh:1556987445437014116> <:minecraft_accept:1556987449996218409> <a:CanhXanh:1541014174312828968>'
     ).split(/[\s,]+/).filter(Boolean),
 
+    // Bot Zin Yeah Store (BOT_PROFILE=cartone) thả 5 emoji, ĐÚNG THỨ TỰ này. LEGIT_REACT_EMOJIS (nếu đặt) ghi đè theo từng vị trí
+    ZIN_LEGIT_REACTIONS: [
+        '<a:CanhXanh:1519460742443569293>',
+        '<:tryingnottolaughblueemojiblue:1534924144431337644>',
+        '<a:CanhXanh:1556987442869964911>',
+        '<a:legit:1507043298198556723>',
+        '<a:85322greencheck:1544237808582131762>'
+    ],
+
     // Emoji "tiền" bot thả thêm vào tin legit của khách đã mua hàng (done / Confirm). Đổi bằng biến LEGIT_MONEY_EMOJI, đặt `off` để tắt
     LEGIT_MONEY_EMOJI: fromEnv('LEGIT_MONEY_EMOJI', '💰'),
 
@@ -53,8 +62,8 @@ module.exports = {
         ).split(/[\s,]+/).filter(Boolean)
     ],
 
-    // Cuối cùng, nếu cả emoji dự phòng cũng lỗi thì dùng emoji thường này (vẫn luôn đủ 3 reaction)
-    LEGIT_FALLBACK_REACTIONS: ['✅', '☑️', '🟢'],
+    // Cuối cùng, nếu cả emoji dự phòng cũng lỗi thì dùng emoji thường này (vẫn luôn đủ số reaction)
+    LEGIT_FALLBACK_REACTIONS: ['✅', '☑️', '🟢', '✔️', '💚'],
 
     // Tên kênh legit = prefix + số (vd: 『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-632). Discord giới hạn đổi tên 2 lần / 10 phút
     // Đổi tên mà không cần sửa code bằng biến LEGIT_CHANNEL_PREFIX

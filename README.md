@@ -22,7 +22,7 @@ Cùng một code, mỗi server một bot riêng (token riêng), chọn bằng bi
 - Bot không có tính năng nào thì lệnh slash đó **không được đăng ký** (lệnh cũ tự biến mất sau lần khởi động đầu), nút / lệnh prefix tương ứng bị bỏ qua.
 - **Dữ liệu:** cho cả 2 bot dùng chung `MONGODB_URI`, `MONGODB_DB`, `MAIN_GUILD_ID`, `DATA_ENCRYPTION_KEY`, `OWNER_ID` như cũ thì dữ liệu mỗi server (khách, bxh, legit đếm, cấu hình) vẫn nguyên, không phải chuyển gì. Mỗi bot chỉ đọc / ghi dữ liệu của server mình.
 - **Triển khai (VPS):** chạy 2 tiến trình cùng một code, mỗi bot một file env riêng (`.env.drew`, `.env.cartone`) khác `DISCORD_TOKEN`, `CLIENT_ID`, `BOT_PROFILE`, `ALLOWED_GUILD_IDS`, chỉ định file bằng `ENV_FILE` (xem mục *Deploy trên VPS*). Application Discord của mỗi bot đều phải bật **Message Content Intent**.
-- **Emoji legit:** 3 emoji react là emoji của Drew Store. Bot Cartone phải ở chung server chứa emoji đó (đặt `ALLOWED_GUILD_IDS` để nó không hoạt động ở đó), hoặc up emoji vào server Cartone rồi đặt `LEGIT_REACT_EMOJIS`. Chạy `/config check_emoji` để kiểm tra.
+- **Emoji legit:** bot Drew thả 3 emoji, bot Zin Yeah Store (`cartone`) thả 5 emoji riêng theo đúng thứ tự. Bot phải thấy được emoji (ở chung server chứa emoji); đổi bằng `/emoji set` hoặc `LEGIT_REACT_EMOJIS`. Chạy `/config check_emoji` để kiểm tra.
 - **Sao lưu `DATA_ENCRYPTION_KEY`** ở nơi an toàn (trình quản lý mật khẩu, ngoài VPS). Mất khóa là mất toàn bộ thông tin đăng nhập acc trong kho; đổi khóa thì acc cũ không giải mã được. Cả 2 bot phải dùng cùng một khóa.
 - `DONE_MAX_AMOUNT` (mặc định 100000000): số tiền tối đa cho một lần `.done` / `/done` / dòng `.nhapbxh`, chặn gõ thừa số 0.
 - `.close` chỉ đóng kênh có chữ `ticket` trong tên **và** không phải kênh hệ thống đã cấu hình (transcript, bill, kho, legit, hướng dẫn, danh mục sold).
@@ -68,7 +68,7 @@ Mỗi server có dữ liệu riêng: **khách + bảng xếp hạng + tổng ti�
 - Mỗi khách mở tối đa `MAX_OPEN_TICKETS` đơn chưa xác nhận cùng lúc.
 
 ## Emoji của bot (`/emoji`)
-Bot dùng 6 vị trí emoji: `online` (nút BUY / Cách mua), `offline` (dòng "Acc đã được bán"), `info` (dòng Seller trên card) và `legit1`, `legit2`, `legit3` (3 reaction legit). Ưu tiên **emoji custom** cho đẹp, emoji thường chỉ là phương án cuối khi emoji custom không dùng được.
+Bot dùng các vị trí emoji: `online` (nút BUY / Cách mua), `offline` (dòng "Acc đã được bán"), `info` (dòng Seller trên card) và `legit1`, `legit2`, `legit3` (reaction legit; bot Zin Yeah Store có thêm `legit4`, `legit5`). Ưu tiên **emoji custom** cho đẹp, emoji thường chỉ là phương án cuối khi emoji custom không dùng được.
 - `/emoji check`: kiểm tra từng vị trí, bot có thấy emoji không, đang dùng emoji nào (và vị trí nào đang phải dùng emoji thường).
 - `/emoji set vitri:<vị trí> emoji:<...>`: đặt emoji cho server này. Nhập bằng cách chọn từ bảng emoji, hoặc gõ **tên** emoji của server (vd `canhxanh`), hoặc dán mã `<:tên:id>` / ID. Bot từ chối emoji custom mà nó không thấy, để không gây lỗi `COMPONENT_INVALID_EMOJI`.
 - `/emoji list`: xem các emoji custom của server mà bot dùng được. `/emoji reset vitri:<vị trí|all>`: về mặc định.

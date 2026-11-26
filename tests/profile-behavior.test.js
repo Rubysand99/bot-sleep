@@ -114,8 +114,8 @@ t('drew: react 3 emoji nhưng KHÔNG đếm số, KHÔNG đổi tên kênh legit
     assert.deepStrictEqual(drew.legit.setName, []);
     assert.ok(!drew.legitCounter, 'drew không được tạo bộ đếm');
 });
-t('cartone: react 3 emoji + ĐẾM số + đổi tên kênh legit', () => {
-    assert.strictEqual(cartone.legit.react, 3);
+t('cartone: react 5 emoji + ĐẾM số + đổi tên kênh legit', () => {
+    assert.strictEqual(cartone.legit.react, 5);
     assert.strictEqual(cartone.legit.setName.length, 1);
     assert.ok(/𝙑𝙤𝙪𝙘𝙝𝙚𝙨-\d+$/u.test(cartone.legit.setName[0]), cartone.legit.setName[0]);
 });

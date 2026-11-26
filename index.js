@@ -1382,7 +1382,7 @@ function markLegitHandled(id) {
     return true;
 }
 
-// Xử lý 1 tin legit. Luôn thả 3 emoji.
+// Xử lý 1 tin legit. Luôn thả đủ emoji theo thứ tự (Zin Yeah Store: 5, còn lại: 3).
 //  - Server BẬT đếm (mặc định): +1 vào bộ đếm RIÊNG của server, rồi (nếu rename) đổi tên kênh thành 『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-<số>
 //  - Server TẮT đếm (/config legit_dem): chỉ react, không đếm số, không đụng tên kênh
 // Trả về số legit vừa đếm, hoặc null nếu không đếm.
@@ -1415,7 +1415,7 @@ async function reactLegit(message, { rename = true, source = 'tin-moi' } = {}) {
     }
 
     const results = [];
-    const reactList = emojis.legitConfigured(g.id);   // 3 emoji theo cấu hình của server (/emoji set) hoặc mặc định
+    const reactList = emojis.legitConfigured(g.id);   // emoji theo cấu hình của server (/emoji set) hoặc mặc định
     for (const [i, emoji] of reactList.entries()) {
         try {
             await message.react(emoji);

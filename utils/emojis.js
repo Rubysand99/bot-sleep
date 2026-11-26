@@ -2,17 +2,28 @@
 // Thứ tự lấy giá trị cho mỗi vị trí:  /emoji set của server  ->  biến môi trường / giá trị mặc định trong code.
 // Emoji thường (unicode) chỉ là phương án CUỐI CÙNG khi emoji custom không dùng được (bot không thấy / đã bị xóa).
 const C = require('./constants');
+const profile = require('./profile');
+
+// Bot Zin Yeah Store (cartone) có 5 reaction legit riêng; các chế độ khác 3
+const isZin = () => profile.current().id === 'cartone';
+const legitCount = () => (isZin() ? C.ZIN_LEGIT_REACTIONS.length : 3);
+const legitDef = (i) => (isZin() && !process.env.LEGIT_REACT_EMOJIS?.trim() ? C.ZIN_LEGIT_REACTIONS[i] : C.LEGIT_REACTIONS[i] || (isZin() ? C.ZIN_LEGIT_REACTIONS[i] : undefined));
+const legitBackups = (i) => (isZin() ? [] : C.LEGIT_BACKUP_REACTIONS[i] || []);   // dự phòng custom là emoji của Drew Store
+const legitSlot = (i) => ({
+    key: `legit${i + 1}`, label: `Reaction legit thứ ${i + 1}`, kind: 'reaction', legitIndex: i,
+    fallback: () => C.LEGIT_FALLBACK_REACTIONS[i] || '✅', def: () => legitDef(i), backups: () => legitBackups(i)
+});
 
 // key = tên vị trí dùng trong /emoji; fallback = emoji thường dùng khi emoji custom hỏng
 const SLOTS = [
     { key: 'online',  label: 'Nút BUY / Cách mua (acc còn hàng)', kind: 'button',   fallback: '🟢',  def: () => C.EMOJI_ONLINE },
     { key: 'offline', label: 'Dòng "Acc đã được bán"',            kind: 'text',     fallback: '🔴',  def: () => C.EMOJI_OFFLINE },
     { key: 'info',    label: 'Dòng "Seller" trên card',           kind: 'text',     fallback: 'ℹ️', def: () => C.EMOJI_INFO },
-    { key: 'legit1',  label: 'Reaction legit thứ 1',              kind: 'reaction', fallback: () => C.LEGIT_FALLBACK_REACTIONS[0] || '✅',  def: () => C.LEGIT_REACTIONS[0], backups: () => C.LEGIT_BACKUP_REACTIONS[0] || [] },
-    { key: 'legit2',  label: 'Reaction legit thứ 2',              kind: 'reaction', fallback: () => C.LEGIT_FALLBACK_REACTIONS[1] || '☑️', def: () => C.LEGIT_REACTIONS[1], backups: () => C.LEGIT_BACKUP_REACTIONS[1] || [] },
-    { key: 'legit3',  label: 'Reaction legit thứ 3',              kind: 'reaction', fallback: () => C.LEGIT_FALLBACK_REACTIONS[2] || '🟢', def: () => C.LEGIT_REACTIONS[2], backups: () => C.LEGIT_BACKUP_REACTIONS[2] || [] }
+    ...[0, 1, 2, 3, 4].map(legitSlot)
 ];
 const slotOf = (key) => SLOTS.find(s => s.key === key) || null;
+// Các vị trí bot đang chạy thực sự dùng
+const activeSlots = () => SLOTS.filter(s => s.legitIndex === undefined || s.legitIndex < legitCount());
 const fallbackOf = (slot) => (typeof slot.fallback === 'function' ? slot.fallback() : slot.fallback);
 
 // ---- Phân tích 1 emoji ----
@@ -93,7 +104,7 @@ function reactionChain(index, guildId) {
     const list = [configured(slot.key, guildId), ...(slot.backups ? slot.backups() : []), fallbackOf(slot)];
     return [...new Set(list.filter(Boolean))];
 }
-const legitConfigured = (guildId) => [1, 2, 3].map(n => configured(`legit${n}`, guildId));
+const legitConfigured = (guildId) => Array.from({ length: legitCount() }, (_, i) => configured(`legit${i + 1}`, guildId));
 
 // ---- Đọc emoji người dùng nhập ở /emoji set ----
 // Chấp nhận: emoji chọn từ bảng emoji / mã <:tên:id> / <a:tên:id>, ID emoji, TÊN emoji có trong server, hoặc emoji thường
@@ -130,7 +141,7 @@ function resolveInput(input, client, guild) {
 }
 
 module.exports = {
-    SLOTS, slotOf, parseEmoji, resolveInput,
+    SLOTS, activeSlots, legitCount, slotOf, parseEmoji, resolveInput,
     clearOverrides, setOverride, getOverride, configured, sourceOf,
     setEmojiChecker, isVisible, effective, text, reactionChain, legitConfigured
 };
