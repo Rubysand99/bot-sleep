@@ -2,6 +2,9 @@
 
 Mỗi bản cập nhật / sửa lỗi thêm 1 mục "## ..." Ở TRÊN CÙNG (mới nhất ở trên). Khi bot khởi động bản mới (version tự tăng), bot gửi embed các mục chưa thông báo vào kênh thông báo.
 
+## 26/11 · Nhân vật xoay trong GIF stock
+- Nhân vật Minecraft trong GIF stock giờ xoay đủ 1 vòng (vẽ 3D từ file skin), bỏ vệt sáng. Không tải được skin thì dùng ảnh tĩnh như cũ.
+
 ## 26/11 · Lệnh /test_stock
 - Thêm `/test_stock [username] [price] [rank] [capes]`: tạo thử ảnh stock GIF để xem trước (Staff/Owner, không đăng acc, kết quả chỉ mình bạn thấy).
 

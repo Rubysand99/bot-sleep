@@ -430,6 +430,25 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal(require('fs').readdirSync(path.join(root, 'assets/card_bg')).filter(f => f.endsWith('.gif')).length, 2, 'giữ 2 GIF nền');
     });
 
+    await test('card stock GIF: nhân vật 3D xoay (vùng skin thay đổi giữa các khung), skin tay to/mảnh đều vẽ được', async () => {
+        const { createCanvas } = require('@napi-rs/canvas');
+        const skin3d = require(path.join(root, 'utils/skin3d'));
+        const tex = createCanvas(64, 64); const tx = tex.getContext('2d');
+        tx.fillStyle = '#c8946a'; tx.fillRect(0, 0, 32, 16); tx.fillRect(40, 16, 16, 16);
+        tx.fillStyle = '#3a6fd8'; tx.fillRect(16, 16, 24, 16);
+        tx.fillStyle = '#222'; tx.fillRect(8, 8, 8, 8);
+        for (const slim of [false, true]) {
+            const t2 = createCanvas(64, 64); const x2 = t2.getContext('2d'); x2.drawImage(tex, 0, 0);
+            if (slim) x2.clearRect(54, 16, 2, 16);
+            const sk = skin3d.prepareSkin(t2, createCanvas);
+            assert.equal(sk.slim, slim);
+            const shot = (yaw) => { const c = createCanvas(300, 420); skin3d.drawPlayer(c.getContext('2d'), sk, { cx: 150, ground: 400, s: 11, yaw }); return Buffer.from(c.getContext('2d').getImageData(0, 0, 300, 420).data); };
+            assert.ok(shot(0).some(v => v !== 0), 'có vẽ nhân vật');
+            assert.ok(!shot(0).equals(shot(Math.PI / 3)), 'xoay thì hình thay đổi');
+            assert.ok(shot(0).equals(shot(Math.PI * 2)), 'xoay đủ vòng về lại như cũ');
+        }
+    });
+
     console.log('\n[6] DM thất bại: giữ thông tin, cho gửi lại, chặn đóng ticket');
     await test('DM lỗi -> delivery=pending, vẫn giữ credential, Close bị chặn, Gửi lại xong thì xóa', async () => {
         const buyer3 = makeUser('800000000000000003', { dmFails: true });

@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const C = require('./constants');
 const cardRenderer = require('./cardRenderer');
+const skin3d = require('./skin3d');
 
 const DESIGN_W = 1280;
 const DESIGN_H = 720;
@@ -249,13 +250,15 @@ async function buildOverlay(data, W, H) {
         ctx.restore();
     }
 
-    // Skin (trái)
+    // Skin (trái): có file skin thì vẽ nhân vật 3D xoay trong từng khung GIF (canvas._skin), không có thì dùng ảnh tĩnh
     const hasName = accountName.toUpperCase() !== 'NON';
-    const { skinImg } = await cardRenderer.fetchSkinData(hasName ? accountName : 'MHF_Steve');
-    let skinTexture = null;
-    if (!skinImg) skinTexture = await cardRenderer.fetchSkinTexture(hasName ? accountName : 'MHF_Steve');
+    const skinName = hasName ? accountName : 'MHF_Steve';
     const cx = 195, ground = 545, maxW = 230, maxH = 370;
-    let dw = 120, dh = 210;
+    const texture = await cardRenderer.fetchSkinTexture(skinName);
+    const prepared = texture ? skin3d.prepareSkin(texture, createCanvas) : null;
+    let skinImg = null;
+    if (!prepared) ({ skinImg } = await cardRenderer.fetchSkinData(skinName));
+    let dw = 130, dh = 210;
     if (skinImg) {
         const ratio = Math.min(maxW / skinImg.width, maxH / skinImg.height);
         dw = Math.round(skinImg.width * ratio);
@@ -267,14 +270,11 @@ async function buildOverlay(data, W, H) {
     ctx.fillStyle = 'rgba(255,120,190,0.55)';
     ctx.fill();
     ctx.restore();
-    ctx.save();
-    if (skinImg) {
+    if (prepared) {
+        canvas._skin = { skin: prepared, cx: cx * s, ground: ground * s, unit: (maxH / 32) * s };
+    } else if (skinImg) {
         ctx.drawImage(skinImg, cx - Math.round(dw / 2), ground - dh, dw, dh);
-    } else if (skinTexture) {
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(skinTexture, 8, 8, 8, 8, cx - 60, ground - 300, 120, 120);   // chỉ có texture: vẽ đầu
     }
-    ctx.restore();
 
     // Credit (dưới trái)
     drawAvatar(78, 636, 24);
@@ -343,17 +343,11 @@ async function encode(bgBuffer, data, W, frameStep) {
         ctx.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh);
         if (BG_BLUR > 0) ctx.filter = 'none';
         ctx.drawImage(overlay, 0, 0);
-        // Vệt sáng chạy ngang card để animation luôn thấy rõ (kể cả khi nền GIF chỉ chuyển động nhẹ)
-        const bw = W * 0.22, bx = -bw + phase * (W + bw * 2);
-        const g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
-        g.addColorStop(0, 'rgba(255,255,255,0)');
-        g.addColorStop(0.5, 'rgba(255,255,255,0.13)');
-        g.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.save();
-        ctx.transform(1, 0, -0.35, 1, H * 0.175, 0);
-        ctx.fillStyle = g;
-        ctx.fillRect(bx, 0, bw, H);
-        ctx.restore();
+        // Nhân vật xoay đủ 1 vòng trong cả vòng lặp GIF
+        if (overlay._skin) {
+            const k = overlay._skin;
+            skin3d.drawPlayer(ctx, k.skin, { cx: k.cx, ground: k.ground, s: k.unit, yaw: phase * Math.PI * 2 });
+        }
         return ctx.getImageData(0, 0, W, H).data;
     };
 
