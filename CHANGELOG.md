@@ -2,6 +2,9 @@
 
 Mỗi bản cập nhật / sửa lỗi thêm 1 mục "## ..." Ở TRÊN CÙNG (mới nhất ở trên). Khi bot khởi động bản mới (version tự tăng), bot gửi embed các mục chưa thông báo vào kênh thông báo.
 
+## 26/11 · Lệnh .tien cộng/trừ tiền
+- Thêm `.tien @user +số` để cộng và `.tien @user -số` để trừ tiền trong tổng chi tiêu (BXH) của khách (Staff/Owner, không xuống dưới 0, tự cập nhật BXH + role mốc).
+
 ## 26/11 · Sửa nền card stock GIF chuyển động
 - Sửa lỗi nền GIF bị đứng hình: giờ dùng đúng 2 GIF nền gốc (không làm mờ), có animation như GIF mẫu.
 

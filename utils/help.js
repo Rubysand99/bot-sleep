@@ -30,6 +30,7 @@ function buildHelpEmbed(member) {
             ['autobuy', '`.vietqr số_tiền ghi_chú`: tạo mã VietQR nhanh trong kênh hiện tại.'],
             ['autobuy', '`.setqr @user MB 0123456789 TEN CHU TK`: **Owner** cài VietQR hộ người khác (xem: `.setqr xem @user`).'],
             ['sold', '`sold`: gõ trong kênh bán hàng để đánh dấu đã bán ngoài hệ thống (không cần dấu chấm).'],
+            ['bxh', '`.tien @user +số` / `-số`: cộng / trừ tiền tổng chi tiêu.'],
             ['bxh', '`.done @khách số_tiền [số_đơn]`: ghi doanh thu cho khách + cập nhật bảng xếp hạng.'],
             ['sold', '`.taokenh tên`: tạo kênh mới `✅・tên`, bot hiện menu cho bạn chọn danh mục.'],
             ['sold', '`.xoakenh #kênh` hoặc `.xoakenh id`: xóa kênh (không xóa được kênh hệ thống / card còn hàng).']

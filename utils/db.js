@@ -406,6 +406,19 @@ async function setCustomerTotal(userId, amount) {
     );
 }
 
+// Cộng/trừ tiền trong tổng chi tiêu (BXH) của khách; không để âm. Trả về { before, after } hoặc doc mới.
+async function adjustCustomerTotal(userId, delta) {
+    const cur = await col('customers').findOne({ _id: String(userId) });
+    const before = cur?.totalSpent || 0;
+    const applied = Math.max(delta, -before);
+    const doc = await col('customers').findOneAndUpdate(
+        { _id: String(userId) },
+        { $inc: { totalSpent: applied }, $set: { updatedAt: now() } },
+        { upsert: true, returnDocument: 'after' }
+    );
+    return { before, after: doc?.totalSpent ?? before + applied, doc };
+}
+
 async function getCustomer(userId) {
     return col('customers').findOne({ _id: String(userId) });
 }
@@ -488,6 +501,7 @@ async function clearRemindersForBuyer(buyerId) {
 }
 
 module.exports = {
+    adjustCustomerTotal,
     connect, close, withGuild, currentGuildId, knownGuildIds, MAIN_GUILD_ID,
     getAccount, findAccounts, findAccountByCardChannel, upsertAccount, updateAccount,
     claimAccount, releaseAccount, markAccountSold, getAccountCredentials, wipeCredentials,

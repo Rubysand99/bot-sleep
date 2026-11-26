@@ -1192,6 +1192,27 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal((await db.getTopCustomers(50)).find(c => c._id === CUST).totalSpent, 200000, 'sai cú pháp không cộng tiền');
         await db.saveSetting('LEADERBOARD_MESSAGE_PFX', null);
     });
+    await test('.tien @user +số / -số: Staff cộng trừ tổng chi tiêu, không âm; khách thường bị từ chối; sai cú pháp báo hướng dẫn', async () => {
+        const here = makeChannel('chat-tien', { id: '123123123123123198' });
+        const CUST = '800000000000000077';
+        const tot = async () => (await db.getTopCustomers(100)).find(c => c._id === CUST)?.totalSpent;
+        await index.handleMessage(msgFor(here, SELLER, `.tien <@${CUST}> +200k`, staffMember()));
+        assert.equal(await tot(), 200000);
+        await index.handleMessage(msgFor(here, SELLER, `.tien <@${CUST}> -50k`, staffMember()));
+        assert.equal(await tot(), 150000);
+        await index.handleMessage(msgFor(here, SELLER, `.tien <@${CUST}> -1M`, staffMember()));
+        assert.equal(await tot(), 0, 'trừ quá số có thì về 0, không âm');
+        const guest = msgFor(here, '800000000000000001', `.tien <@${CUST}> +1M`);
+        await index.handleMessage(guest);
+        assert.ok(JSON.stringify(guest.replies).includes('Staff'));
+        assert.equal(await tot(), 0);
+        for (const bad of ['.tien', `.tien <@${CUST}>`, `.tien <@${CUST}> 50k`, '.tien abc +50k']) {
+            const b = msgFor(here, SELLER, bad, staffMember());
+            await index.handleMessage(b);
+            assert.ok(JSON.stringify(b.replies).includes('Cú pháp'), bad);
+        }
+        assert.equal(await tot(), 0);
+    });
     await test('.done trong ticket đã Confirm: bị chặn, không cộng trùng', async () => {
         const buyer = users.get('800000000000000001');
         const { cardCh, cardMsg } = await seedAccount('done4');
