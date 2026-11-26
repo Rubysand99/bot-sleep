@@ -10,7 +10,7 @@ const cardRenderer = require('./cardRenderer');
 
 const DESIGN_W = 1280;
 const DESIGN_H = 720;
-const BG_BLUR = 3;   // độ mờ nền (px trên khung thiết kế 1280x720)
+const BG_BLUR = 0;   // độ mờ nền (px trên khung thiết kế 1280x720); 0 = giữ nguyên chuyển động / chi tiết của GIF gốc
 const FONT = '"CardFallback", "Segoe UI", Arial, sans-serif';
 
 let BG_DIR = path.join(__dirname, '../assets/card_bg');
@@ -78,11 +78,11 @@ async function buildOverlay(data, W, H) {
     ctx.imageSmoothingQuality = 'high';
 
     // Làm tối nền + vignette cho chữ dễ đọc
-    ctx.fillStyle = 'rgba(5, 8, 22, 0.38)';
+    ctx.fillStyle = 'rgba(5, 8, 22, 0.2)';
     ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
     const vg = ctx.createRadialGradient(DESIGN_W / 2, DESIGN_H / 2, 260, DESIGN_W / 2, DESIGN_H / 2, 820);
     vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,0.42)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.3)');
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
 
@@ -289,7 +289,7 @@ async function buildOverlay(data, W, H) {
     return canvas;
 }
 
-// Đọc từng khung của GIF nền (đã gộp khung theo disposal), trả về { rgba, width, height, delay }
+// Đọc từng khung của GIF nền (đã gộp khung theo disposal), trả về { rgba (bản sao riêng của khung), width, height, delay }
 function* gifFrames(buffer) {
     const reader = new GifReader(buffer);
     const w = reader.width, h = reader.height;
@@ -306,7 +306,7 @@ function* gifFrames(buffer) {
         const info = reader.frameInfo(i);
         if (info.disposal === 3) saved = px.slice();
         reader.decodeAndBlitFrameRGBA(i, px);
-        yield { rgba: px, width: w, height: h, delay: Math.max(20, (info.delay || 5) * 10) };
+        yield { rgba: px.slice(), width: w, height: h, delay: Math.max(20, (info.delay || 5) * 10) };
         prevInfo = info;
     }
 }
@@ -337,12 +337,11 @@ async function encode(bgBuffer, data, W, frameStep) {
             srcCtx = src.getContext('2d');
         }
         srcCtx.putImageData(new ImageData(frame.rgba, frame.width, frame.height), 0, 0);
-        // Phóng hơi lớn + làm mờ nhẹ: nền GIF độ phân giải thấp nên mịn hơn, đẹp hơn và GIF xuất ra cũng nhẹ hơn nhiều
-        const scale = Math.max(W / frame.width, H / frame.height) * 1.05;
+                const scale = Math.max(W / frame.width, H / frame.height) * (BG_BLUR > 0 ? 1.05 : 1);
         const dw = frame.width * scale, dh = frame.height * scale;
-        ctx.filter = `blur(${(BG_BLUR * W / DESIGN_W).toFixed(2)}px)`;
+        if (BG_BLUR > 0) ctx.filter = `blur(${(BG_BLUR * W / DESIGN_W).toFixed(2)}px)`;
         ctx.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh);
-        ctx.filter = 'none';
+        if (BG_BLUR > 0) ctx.filter = 'none';
         ctx.drawImage(overlay, 0, 0);
         return ctx.getImageData(0, 0, W, H).data;
     };

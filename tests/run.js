@@ -421,6 +421,12 @@ const msgFor = (channel, authorId, content, member) => {
         const { GifReader } = require('omggif');
         const rd = new GifReader(r.buffer);
         assert.ok(rd.numFrames() >= 20, 'GIF động nhiều khung: ' + rd.numFrames());
+        // nền phải THỰC SỰ chuyển động: các khung không được giống hệt nhau (lỗi cũ: mọi khung trùng khung cuối)
+        const px = (i) => { const a = new Uint8Array(rd.width * rd.height * 4); rd.decodeAndBlitFrameRGBA(i, a); return a; };
+        const f0 = px(0), fMid = px(Math.floor(rd.numFrames() / 2));
+        let diff = 0;
+        for (let i = 0; i < f0.length; i += 4) if (f0[i] !== fMid[i] || f0[i + 1] !== fMid[i + 1] || f0[i + 2] !== fMid[i + 2]) diff++;
+        assert.ok(diff > f0.length / 4 * 0.01, 'nền GIF phải chuyển động, số điểm ảnh khác nhau: ' + diff);
         assert.equal(require('fs').readdirSync(path.join(root, 'assets/card_bg')).filter(f => f.endsWith('.gif')).length, 2, 'giữ 2 GIF nền');
     });
 

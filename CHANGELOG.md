@@ -2,6 +2,9 @@
 
 Mỗi bản cập nhật / sửa lỗi thêm 1 mục "## ..." Ở TRÊN CÙNG (mới nhất ở trên). Khi bot khởi động bản mới (version tự tăng), bot gửi embed các mục chưa thông báo vào kênh thông báo.
 
+## 26/11 · Sửa nền card stock GIF chuyển động
+- Sửa lỗi nền GIF bị đứng hình: giờ dùng đúng 2 GIF nền gốc (không làm mờ), có animation như GIF mẫu.
+
 ## 26/11 · Ảnh stock GIF, DM giao acc đầy đủ, tự đóng ticket
 - Card stock giờ là **GIF động**: nền random 1 trong 2 GIF, ghi tên bot đang chạy và `made by rubynek209`.
 - DM giao acc cho buyer có ảnh stock + đủ thông tin đăng nhập + Seller / Buyer / Đơn giá. Bill dùng cùng ảnh nhưng **ẩn** thông tin đăng nhập.
