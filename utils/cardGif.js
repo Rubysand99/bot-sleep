@@ -331,7 +331,7 @@ async function encode(bgBuffer, data, W, frameStep) {
     ctx.imageSmoothingQuality = 'high';
     let src = null, srcCtx = null;
 
-    const compose = (frame) => {
+    const compose = (frame, phase = 0) => {
         if (!src || src.width !== frame.width || src.height !== frame.height) {
             src = createCanvas(frame.width, frame.height);
             srcCtx = src.getContext('2d');
@@ -343,6 +343,17 @@ async function encode(bgBuffer, data, W, frameStep) {
         ctx.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh);
         if (BG_BLUR > 0) ctx.filter = 'none';
         ctx.drawImage(overlay, 0, 0);
+        // Vệt sáng chạy ngang card để animation luôn thấy rõ (kể cả khi nền GIF chỉ chuyển động nhẹ)
+        const bw = W * 0.22, bx = -bw + phase * (W + bw * 2);
+        const g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+        g.addColorStop(0, 'rgba(255,255,255,0)');
+        g.addColorStop(0.5, 'rgba(255,255,255,0.13)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.save();
+        ctx.transform(1, 0, -0.35, 1, H * 0.175, 0);
+        ctx.fillStyle = g;
+        ctx.fillRect(bx, 0, bw, H);
+        ctx.restore();
         return ctx.getImageData(0, 0, W, H).data;
     };
 
@@ -352,7 +363,7 @@ async function encode(bgBuffer, data, W, frameStep) {
     const sampleIdx = new Set(Array.from({ length: Math.min(6, total) }, (_, k) => Math.floor(k * total / Math.min(6, total))));
     const chunks = [];
     for (const idx of sampleIdx) {
-        const rgba = compose(frames[idx]);
+        const rgba = compose(frames[idx], idx / total);
         const sub = new Uint8Array(Math.ceil(rgba.length / 16) * 4);
         for (let p = 0, q = 0; p < rgba.length; p += 16, q += 4) { sub[q] = rgba[p]; sub[q + 1] = rgba[p + 1]; sub[q + 2] = rgba[p + 2]; sub[q + 3] = 255; }
         chunks.push(sub);
@@ -371,7 +382,7 @@ async function encode(bgBuffer, data, W, frameStep) {
     for (let i = 0; i < total; i++) {
         carry += frames[i].delay;
         if (i % frameStep !== 0) continue;
-        const rgba = compose(frames[i]);
+        const rgba = compose(frames[i], i / total);
         const index = applyPalette(rgba, palette, 'rgb565');
         gif.writeFrame(index, W, H, first ? { palette, delay: carry, repeat: 0 } : { delay: carry });
         first = false;

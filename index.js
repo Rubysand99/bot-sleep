@@ -223,56 +223,51 @@ async function renderAccountCard(account, fallback = {}) {
     }
 }
 
-// ctx: { sellerName, buyerName, imageName } (đều tuỳ chọn)
-function buildCredentialsEmbed(account, creds, guild, ctx = {}) {
-    const ytRef = formatRef(cfg('KENH_YOUTUBE', guild), 'KENH_YOUTUBE');
-    const faRef = formatRef(cfg('KENH_2FA', guild), 'KENH_2FA');
-    const lockRef = formatRef(cfg('KENH_LOCK', guild), 'KENH_LOCK');
-    const vouchRef = formatRef(cfg('KENH_VOUCH', guild), 'KENH_VOUCH');
+// Nút link tới các kênh hướng dẫn (theo mẫu): TOS, Secure, Sec 2FA, Tránh Lock. Kênh chưa đặt thì bỏ nút đó.
+function buildGuideButtons(guild) {
+    const gid = guild?.id;
+    const id = (...keys) => keys.map(k => String(cfg(k, guild) || '').trim()).find(v => /^\d{17,20}$/.test(v)) || '';
+    const defs = [
+        ['TOS', '❗', id('BILL_KENH_DIEUKHOAN')],
+        ['Secure', '🔐', id('BILL_KENH_DOITHONGTIN', 'KENH_YOUTUBE')],
+        ['Sec 2FA', '🔑', id('BILL_KENH_2FA', 'KENH_2FA')],
+        ['Tránh Lock', '⚠️', id('KENH_LOCK')]
+    ].filter(d => d[2] && gid);
+    if (!defs.length) return [];
+    return [new ActionRowBuilder().addComponents(defs.map(([label, emoji, ch]) =>
+        new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setEmoji(emoji).setURL(`https://discord.com/channels/${gid}/${ch}`)))];
+}
 
+// ctx: { sellerName, sellerId, buyerName, priceText, imageName } (đều tuỳ chọn)
+function buildCredentialsEmbed(account, creds, guild, ctx = {}) {
+    const vouchRef = formatRef(cfg('KENH_VOUCH', guild), '') || vouchChannelRef(guild) || 'kênh vouch';
     const targetUsername = displayUsername(account?.username);
     const hasRealName = targetUsername !== 'NON';
-    const capesDisplay = account?.capes && account.capes.trim() ? account.capes.trim() : 'None';
+    const v = (x) => `\`${String(x ?? '').trim() || 'NON'}\``;
+    const capes = account?.capes && account.capes.trim() ? account.capes.trim() : 'NON';
+    const legitLine = `+1 legit ${ctx.sellerId ? `<@${ctx.sellerId}>` : '@seller'} ${ctx.priceText && ctx.priceText !== 'N/A' ? `${ctx.priceText} ` : ''}${hasRealName ? targetUsername : ''}`.trim();
 
     return new EmbedBuilder()
-        .setAuthor({
-            name: `${profile.brand()} - Giao Dịch Hoàn Tất`,
-            iconURL: guild?.iconURL() || undefined
-        })
-        .setTitle(`🎉 THÔNG TIN TÀI KHOẢN: ${targetUsername}`)
+        .setTitle(`🧿 THÔNG TIN TÀI KHOẢN: ${targetUsername} 🧿`)
         .setColor('#00FF00')
+        .setDescription(
+            `🪪 **Username:** ${v(hasRealName ? targetUsername : 'NON')}\n` +
+            `🏅 **Rank:** ${v(account?.rank)}\n` +
+            `🧣 **Capes:** ${v(capes)}\n\n` +
+            `📧 **Primary Email:** ${v(creds.primaryEmail)}\n` +
+            `🔑 **Recovery Code:** ${v(creds.recoveryCode)}\n` +
+            `🛡️ **Security Email:** ${v(creds.securityEmail)}\n` +
+            `🔒 **Password:** ${v(creds.password)}\n` +
+            `🗝️ **Secret Key:** ${v(creds.secretKey)}\n\n` +
+            `🟢 Hãy legit ở ${vouchRef} đây để được bảo hành\n` +
+            `\`${legitLine}\``
+        )
         .addFields(
             { name: '🧑‍💼 Seller', value: ctx.sellerName || 'N/A', inline: true },
             { name: '👤 Buyer', value: ctx.buyerName || 'N/A', inline: true },
             { name: '💰 Đơn giá', value: ctx.priceText || 'N/A', inline: true }
         )
-        .setDescription(
-            `### 🏅 Rank\n` +
-            `${String(account?.rank || '').trim() || 'NON'}\n\n` +
-            `### 🏷️ Capes\n` +
-            `${capesDisplay}\n\n` +
-            `### 🔐 Thông Tin Đăng Nhập\n` +
-            `\`\`\`text\n` +
-            `Username: ${hasRealName ? targetUsername : 'N/A'}\n` +
-            `Password: ${creds.password || 'N/A'}\n` +
-            `Primary Email: ${creds.primaryEmail || 'N/A'}\n` +
-            `Security Email: ${creds.securityEmail || 'N/A'}\n` +
-            `Recovery Code: ${creds.recoveryCode || 'N/A'}\n` +
-            `Secret Key: ${creds.secretKey || 'N/A'}\n` +
-            `\`\`\`\n` +
-            `⚠️ *Vui lòng lưu lại và thay đổi thông tin bảo mật ngay lập tức!*\n\n` +
-            `---\n\n` +
-            `## Cách Thay Thông Tin\n` +
-            `${ytRef}\n` +
-            `${faRef}\n` +
-            `${lockRef}\n\n` +
-            `## Hãy nhớ VOUCH cho ${profile.brand()}\n` +
-            `${vouchRef}`
-        )
-        .setFooter({
-            text: `${profile.brand()} • Cảm ơn bạn đã tin tưởng và ủng hộ!`,
-            iconURL: guild?.iconURL() || undefined
-        })
+        .setFooter({ text: `${profile.brand()} • Cảm ơn bạn đã tin tưởng và ủng hộ!`, iconURL: guild?.iconURL() || undefined })
         .setTimestamp()
         .setImage(ctx.imageName ? `attachment://${ctx.imageName}` : null);
 }
@@ -287,6 +282,7 @@ async function sendCredentialsDM(user, account, creds, guild, out = {}, ticket =
         const card = await renderAccountCard(account, { username: ticket?.username, price: ticket?.price });
         const priceNum = cardRendererParsePrice(account?.price || ticket?.price);
         const ctx = {
+            sellerId: sellerUser?.id || sellerId || null,
             sellerName: sellerUser ? (sellerUser.displayName || sellerUser.username) : (sellerId ? `<@${sellerId}>` : 'N/A'),
             buyerName: user.displayName || user.username || 'N/A',
             priceText: (account?.price || ticket?.price) ? cardGif.vnd(priceNum) : 'N/A',
@@ -295,6 +291,7 @@ async function sendCredentialsDM(user, account, creds, guild, out = {}, ticket =
         await user.send({
             content: `Cảm ơn bạn đã mua tài khoản tại **${profile.brand()}**! Dưới đây là thông tin tài khoản của bạn:`,
             embeds: [buildCredentialsEmbed(account, creds, guild, ctx)],
+            components: buildGuideButtons(guild),
             files: card ? [new AttachmentBuilder(card.buffer, { name: card.name })] : []
         });
         return true;

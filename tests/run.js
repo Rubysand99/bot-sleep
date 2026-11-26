@@ -282,7 +282,7 @@ const msgFor = (channel, authorId, content, member) => {
         await index.handleInteraction(it);
 
         const dm = buyer1.dms.at(-1);
-        assert.ok(dm.embeds[0].data.description.includes('Password: pw-conf1'), 'DM phải có mật khẩu');
+        assert.ok(dm.embeds[0].data.description.includes('`pw-conf1`'), 'DM phải có mật khẩu');
         assert.equal((await db.getAccount('conf1')).status, 'SOLD');
         assert.equal(await db.getAccountCredentials('conf1'), null, 'credential phải bị xóa sau khi giao');
         assert.equal((await db.getTicket(ticketCh.id)).delivery, 'dm');
@@ -385,7 +385,7 @@ const msgFor = (channel, authorId, content, member) => {
         assert.ok(f['🧑‍💼 Seller'] && f['🧑‍💼 Seller'] !== 'N/A', 'có tên seller');
         assert.equal(f['👤 Buyer'], buyer.username, 'có tên buyer');
         assert.ok(/\d/.test(f['💰 Đơn giá']) && f['💰 Đơn giá'].includes('đ'), 'có đơn giá: ' + f['💰 Đơn giá']);
-        for (const v of ['Username: dmcard1', 'Password: pw-dmcard1', 'Primary Email: a@b.c', 'Security Email: s@b.c', 'Recovery Code: rc', 'Secret Key: sk', 'MVP']) {
+        for (const v of ['`dmcard1`', '`pw-dmcard1`', '`a@b.c`', '`s@b.c`', '`rc`', '`sk`', 'MVP', '+1 legit <@']) {
             assert.ok(e.description.includes(v), 'DM buyer phải đủ thông tin: ' + v);
         }
     });
@@ -982,7 +982,7 @@ const msgFor = (channel, authorId, content, member) => {
         const t = await ticketWith(ticketCh);
         assert.equal(t.confirmed, true); assert.equal(t.payos.state, 'paid'); assert.equal(t.delivery, 'dm');
         assert.equal(buyer.dms.length, dmBefore + 1);
-        assert.ok(buyer.dms.at(-1).embeds[0].data.description.includes('Password: pw-pay1'));
+        assert.ok(buyer.dms.at(-1).embeds[0].data.description.includes('`pw-pay1`'));
         assert.equal((await db.getAccount('pay1')).status, 'SOLD');
         assert.ok(JSON.stringify(ticketCh.sent).includes('qua payOS'));
         assert.ok(FakeMongoClient.last.db('autobuy').collection('reminders').docs.some(d => d._id === ticketCh.id));
