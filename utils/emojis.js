@@ -1,6 +1,6 @@
 // Emoji bot cần dùng, đặt riêng TỪNG server bằng lệnh /emoji (lưu trong MongoDB), ưu tiên emoji custom.
 // Thứ tự lấy giá trị cho mỗi vị trí:  /emoji set của server  ->  biến môi trường / giá trị mặc định trong code.
-// Emoji thường (unicode) chỉ là phương án CUỐI CÙNG khi emoji custom không dùng được (bot không thấy / đã bị xóa).
+// Khi emoji custom không dùng được (bot không thấy / đã bị xóa): nút và dòng chữ dùng emoji thường; reaction legit thì BỎ QUA vị trí đó.
 const C = require('./constants');
 const profile = require('./profile');
 
@@ -11,10 +11,10 @@ const legitDef = (i) => (isZin() && !process.env.LEGIT_REACT_EMOJIS?.trim() ? C.
 const legitBackups = (i) => (isZin() ? [] : C.LEGIT_BACKUP_REACTIONS[i] || []);   // dự phòng custom là emoji của Drew Store
 const legitSlot = (i) => ({
     key: `legit${i + 1}`, label: `Reaction legit thứ ${i + 1}`, kind: 'reaction', legitIndex: i,
-    fallback: () => C.LEGIT_FALLBACK_REACTIONS[i] || '✅', def: () => legitDef(i), backups: () => legitBackups(i)
+    def: () => legitDef(i), backups: () => legitBackups(i)
 });
 
-// key = tên vị trí dùng trong /emoji; fallback = emoji thường dùng khi emoji custom hỏng
+// key = tên vị trí dùng trong /emoji; fallback = emoji thường dùng khi emoji custom hỏng (reaction legit không có)
 const SLOTS = [
     { key: 'online',  label: 'Nút BUY / Cách mua (acc còn hàng)', kind: 'button',   fallback: '🟢',  def: () => C.EMOJI_ONLINE },
     { key: 'offline', label: 'Dòng "Acc đã được bán"',            kind: 'text',     fallback: '🔴',  def: () => C.EMOJI_OFFLINE },
@@ -24,7 +24,7 @@ const SLOTS = [
 const slotOf = (key) => SLOTS.find(s => s.key === key) || null;
 // Các vị trí bot đang chạy thực sự dùng
 const activeSlots = () => SLOTS.filter(s => s.legitIndex === undefined || s.legitIndex < legitCount());
-const fallbackOf = (slot) => (typeof slot.fallback === 'function' ? slot.fallback() : slot.fallback);
+const fallbackOf = (slot) => slot.fallback || '';
 
 // ---- Phân tích 1 emoji ----
 const CUSTOM_RE = /^<(a?):([A-Za-z0-9_]{2,32}):(\d{15,25})>$/;
@@ -75,13 +75,14 @@ function warnOnce(key, msg, extra) {
     try { require('./logger').log.warn('EMOJI', msg, extra); } catch { /* bỏ qua */ }
 }
 
-// Emoji THỰC SỰ sẽ dùng: custom nếu bot thấy, ngược lại mới dùng emoji thường
+// Emoji THỰC SỰ sẽ dùng: custom nếu bot thấy, ngược lại dùng emoji thường (reaction legit: value rỗng = bỏ qua)
 function effective(slotKey, guildId) {
     const slot = slotOf(slotKey);
     const value = configured(slotKey, guildId);
     const p = parseEmoji(value);
     const fb = slot ? fallbackOf(slot) : '✅';
-    if (!p) return { value: fb, configured: value, custom: false, usedFallback: true, source: sourceOf(slotKey, guildId), reason: 'giá trị không phải emoji hợp lệ' };
+    const skipped = slot?.kind === 'reaction';
+    if (!p) return { value: fb, skipped, configured: value, custom: false, usedFallback: !skipped, source: sourceOf(slotKey, guildId), reason: 'giá trị không phải emoji hợp lệ' };
     if (!p.custom) return { value: p.raw, configured: value, custom: false, usedFallback: false, source: sourceOf(slotKey, guildId) };
     if (isVisible(p.id)) return { value: p.raw, configured: value, custom: true, usedFallback: false, source: sourceOf(slotKey, guildId) };
     // Vị trí có emoji custom dự phòng (reaction legit): thử dự phòng còn thấy được trước khi dùng emoji thường
@@ -91,17 +92,17 @@ function effective(slotKey, guildId) {
             return { value: bp.raw, configured: value, custom: true, usedFallback: false, usedBackup: true, source: sourceOf(slotKey, guildId), reason: 'emoji chính bot không thấy, đang dùng emoji custom dự phòng' };
         }
     }
-    warnOnce(`${slotKey}:${guildId}:${p.id}`, `Emoji "${slotKey}" không dùng được (bot không thấy hoặc đã bị xóa), tạm dùng emoji thường`,
+    warnOnce(`${slotKey}:${guildId}:${p.id}`, `Emoji "${slotKey}" không dùng được (bot không thấy hoặc đã bị xóa), ${skipped ? 'bỏ qua vị trí này' : 'tạm dùng emoji thường'}`,
         { emoji: p.raw, thay_bang: fb, guildId, goiy: 'Chạy /emoji check rồi /emoji set để đặt emoji custom bot thấy được' });
-    return { value: fb, configured: value, custom: true, usedFallback: true, source: sourceOf(slotKey, guildId), reason: 'bot không thấy emoji này' };
+    return { value: fb, skipped, configured: value, custom: true, usedFallback: !skipped, source: sourceOf(slotKey, guildId), reason: 'bot không thấy emoji này' };
 }
 const text = (slotKey, guildId) => effective(slotKey, guildId).value;
 
-// Dành cho reaction legit: danh sách [emoji cần thả, ...emoji dự phòng custom, emoji thường cuối cùng]
+// Dành cho reaction legit: danh sách [emoji cần thả, ...emoji dự phòng custom]. Hết danh sách thì bỏ qua vị trí
 function reactionChain(index, guildId) {
     const slot = slotOf(`legit${index + 1}`);
     if (!slot) return [];
-    const list = [configured(slot.key, guildId), ...(slot.backups ? slot.backups() : []), fallbackOf(slot)];
+    const list = [configured(slot.key, guildId), ...(slot.backups ? slot.backups() : [])];
     return [...new Set(list.filter(Boolean))];
 }
 const legitConfigured = (guildId) => Array.from({ length: legitCount() }, (_, i) => configured(`legit${i + 1}`, guildId));

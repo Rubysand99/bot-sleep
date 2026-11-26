@@ -833,7 +833,7 @@ const msgFor = (channel, authorId, content, member) => {
         legitUtil.scheduleLegitRename(legitCh, 634, { force: true });
         assert.equal(legitCh.name, '『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-634');
     });
-    await test('1 emoji legit lỗi: bot vẫn thả đủ 3 reaction (thay bằng emoji thường), không crash', async () => {
+    await test('1 emoji legit lỗi: thử emoji custom dự phòng, không crash', async () => {
         legitUtil.resetLegitRenameState();
         const legitCh = registry.get(LEGIT_CH);
         const m = msgFor(legitCh, '800000000000000090', `+1 legit <@${SELLER}> x`);
@@ -848,7 +848,7 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal(m.reacts[0], '<a:CanhXanh:1556987445437014116>');
         assert.equal(m.reacts[2], '<a:CanhXanh:1561268756850937876>', 'emoji 3 lỗi -> dùng emoji dự phòng thứ nhất');
     });
-    await test('emoji thứ 3 lỗi + dự phòng 1 lỗi -> dùng dự phòng 2; cả 3 lỗi -> emoji thường', async () => {
+    await test('emoji thứ 3 lỗi + dự phòng 1 lỗi -> dùng dự phòng 2; cả 3 lỗi -> bỏ qua vị trí', async () => {
         legitUtil.resetLegitRenameState();
         const legitCh = registry.get(LEGIT_CH);
         const bad = (...ids) => async function (e) {
@@ -865,8 +865,18 @@ const msgFor = (channel, authorId, content, member) => {
         console.warn = warn; console.error = err;
         assert.equal(m1.reacts.length, 3);
         assert.equal(m1.reacts[2], '<a:canhxanh2:1519732018215129090>');
-        assert.equal(m2.reacts.length, 3);
-        assert.equal(m2.reacts[2], '🟢');
+        assert.equal(m2.reacts.length, 2, 'không thay bằng emoji thường');
+    });
+    await test('không react được emoji nào: không có emoji thường, ghi nhớ tin đã đếm để không đếm lại khi khởi động', async () => {
+        legitUtil.resetLegitRenameState();
+        const m = msgFor(registry.get(LEGIT_CH), '800000000000000093', `+1 legit <@${SELLER}> z`);
+        m.id = 'noreact-1';
+        m.react = async () => { throw Object.assign(new Error('Unknown Emoji'), { code: 10014 }); };
+        const warn = console.warn, err = console.error; console.warn = () => {}; console.error = () => {};
+        await index.handleMessage(m);
+        console.warn = warn; console.error = err;
+        assert.equal(m.reacts.length, 0);
+        assert.ok((await db.getSetting('LEGIT_NOREACT_' + guild.id)).includes(m.id));
     });
     await test('chống spam kênh legit: cùng 1 người gửi liên tiếp chỉ đếm 1 lần', async () => {
         const old = C.LEGIT_COOLDOWN_SEC; C.LEGIT_COOLDOWN_SEC = 60;

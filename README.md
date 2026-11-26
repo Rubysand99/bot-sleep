@@ -68,7 +68,7 @@ Mỗi server có dữ liệu riêng: **khách + bảng xếp hạng + tổng ti�
 - Mỗi khách mở tối đa `MAX_OPEN_TICKETS` đơn chưa xác nhận cùng lúc.
 
 ## Emoji của bot (`/emoji`)
-Bot dùng các vị trí emoji: `online` (nút BUY / Cách mua), `offline` (dòng "Acc đã được bán"), `info` (dòng Seller trên card) và `legit1`, `legit2`, `legit3` (reaction legit; bot Zin Yeah Store có thêm `legit4`, `legit5`). Ưu tiên **emoji custom** cho đẹp, emoji thường chỉ là phương án cuối khi emoji custom không dùng được.
+Bot dùng các vị trí emoji: `online` (nút BUY / Cách mua), `offline` (dòng "Acc đã được bán"), `info` (dòng Seller trên card) và `legit1`, `legit2`, `legit3` (reaction legit; bot Zin Yeah Store có thêm `legit4`, `legit5`). Ưu tiên **emoji custom** cho đẹp, khi emoji custom không dùng được thì nút / dòng chữ dùng emoji thường, còn reaction legit bỏ qua vị trí đó.
 - `/emoji check`: kiểm tra từng vị trí, bot có thấy emoji không, đang dùng emoji nào (và vị trí nào đang phải dùng emoji thường).
 - `/emoji set vitri:<vị trí> emoji:<...>`: đặt emoji cho server này. Nhập bằng cách chọn từ bảng emoji, hoặc gõ **tên** emoji của server (vd `canhxanh`), hoặc dán mã `<:tên:id>` / ID. Bot từ chối emoji custom mà nó không thấy, để không gây lỗi `COMPONENT_INVALID_EMOJI`.
 - `/emoji list`: xem các emoji custom của server mà bot dùng được. `/emoji reset vitri:<vị trí|all>`: về mặc định.
@@ -80,7 +80,7 @@ Các cách viết đều nhận: `+1 legit @shop`, `+1legit @shop`, `legit +1 @s
 Discord chỉ cho đổi tên kênh 2 lần / 10 phút nên bot đổi tối đa 1 lần / ~5 phút (luôn lấy số mới nhất).
 Bot cần ở server chứa các emoji trên, và có quyền Manage Channels, Add Reactions, Use External Emojis trong kênh legit.
 Chỉnh số hiện tại bằng `/config legit_count so:632` (legit kế tiếp là 633).
-Nếu thiếu emoji: chạy `/config check_emoji` để biết emoji nào bot không thấy và quyền còn thiếu. Khi 1 emoji lỗi, bot thả emoji thường thay thế để luôn đủ 3 reaction.
+Nếu thiếu emoji: chạy `/config check_emoji` để biết emoji nào bot không thấy và quyền còn thiếu. Khi 1 emoji lỗi (và không có emoji custom dự phòng), bot bỏ qua vị trí đó, các emoji còn lại vẫn đúng thứ tự.
 
 ## Debug khi 1 server không react emoji
 Bot chạy nhiều server thì **mỗi server phải có kênh legit riêng**. Kênh legit KHÔNG đặt bằng biến trong `.env`: mỗi server tự đặt bằng lệnh (chạy NGAY TRONG server đó):

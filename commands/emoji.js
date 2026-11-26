@@ -12,6 +12,7 @@ function describeSlot(client, slot, guildId) {
     const p = emojis.parseEmoji(e.configured);
     const head = `**${slot.key}** · ${slot.label}`;
     const src = SRC[e.source];
+    if (e.skipped) return { ok: false, unicode: false, text: `${head}\n❌ \`${p?.name || e.configured}\` · bot **không dùng được** · nguồn: ${src}.\n↳ Bot **bỏ qua** vị trí này khi react.` };
     if (!p) return { ok: false, unicode: true, text: `${head}\n❌ Giá trị \`${e.configured}\` không phải emoji hợp lệ · nguồn: ${src}. Đang dùng tạm ${e.value}.` };
     if (!p.custom) return { ok: true, unicode: true, text: `${head}\n⚠️ ${p.raw} là **emoji thường** · nguồn: ${src}. Nên đặt emoji custom bằng \`/emoji set\`.` };
     const found = client.emojis.cache.get(p.id);
@@ -56,7 +57,7 @@ module.exports = {
                 .addFields({
                     name: 'Tổng kết',
                     value: [
-                        bad ? `❌ ${bad}/${rows.length} vị trí lỗi (bot không thấy emoji), đang dùng tạm emoji thường.` : `✅ Mọi emoji custom đều dùng được.`,
+                        bad ? `❌ ${bad}/${rows.length} vị trí lỗi (bot không thấy emoji): reaction legit bị bỏ qua, nút / chữ dùng tạm emoji thường.` : `✅ Mọi emoji custom đều dùng được.`,
                         plain && !bad ? `⚠️ ${plain}/${rows.length} vị trí đang dùng emoji thường.` : '',
                         canExternal === false ? '❌ Role của bot thiếu quyền **Use External Emojis** (cần để dùng emoji của server khác).' : '',
                         'Đặt emoji: `/emoji set` · Xem emoji có sẵn: `/emoji list` · Về mặc định: `/emoji reset`'

@@ -1382,6 +1382,15 @@ function markLegitHandled(id) {
     return true;
 }
 
+// Tin legit đã đếm nhưng không react được emoji nào (lưu MongoDB, giữ 200 tin gần nhất)
+const noReactKey = (guildId) => `LEGIT_NOREACT_${guildId}`;
+const noReactIds = async (guildId) => { const v = await db.getSetting(noReactKey(guildId)).catch(() => null); return Array.isArray(v) ? v : []; };
+async function rememberNoReact(guildId, msgId) {
+    const ids = await noReactIds(guildId);
+    await db.saveSetting(noReactKey(guildId), [...ids, msgId].slice(-200))
+        .catch(err => log.warn('LEGIT', 'Không lưu được tin legit chưa react', { guildId, msgId, ...errInfo(err) }));
+}
+
 // Xử lý 1 tin legit. Luôn thả đủ emoji theo thứ tự (Zin Yeah Store: 5, còn lại: 3).
 //  - Server BẬT đếm (mặc định): +1 vào bộ đếm RIÊNG của server, rồi (nếu rename) đổi tên kênh thành 『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-<số>
 //  - Server TẮT đếm (/config legit_dem): chỉ react, không đếm số, không đụng tên kênh
@@ -1423,11 +1432,10 @@ async function reactLegit(message, { rename = true, source = 'tin-moi' } = {}) {
             log.debug('LEGIT', `react ${i + 1}/${reactList.length} OK`, { ...ctx, emoji });
         } catch (err) {
             // Thường do bot chưa ở server chứa emoji, emoji đã bị xóa, hoặc kênh thiếu quyền Use External Emojis.
-            // Dùng /config check_emoji hoặc /config debug để xem. Thử lần lượt emoji dự phòng của vị trí này,
-            // rồi tới emoji thường, để luôn đủ số reaction.
-            log.warn('LEGIT', `react ${i + 1}/${reactList.length} THẤT BẠI, thử emoji dự phòng`, { ...ctx, emoji, ...errInfo(err), goiy: hint(err) });
-            const chain = emojis.reactionChain(i, g.id).filter(e => e !== emoji);   // emoji custom dự phòng trước, emoji thường sau cùng
-            if (!chain.length) chain.push('✅');
+            // Dùng /config check_emoji hoặc /config debug để xem. Thử emoji custom dự phòng của vị trí này (nếu có),
+            // không được thì BỎ QUA vị trí, không thay bằng emoji thường.
+            log.warn('LEGIT', `react ${i + 1}/${reactList.length} THẤT BẠI`, { ...ctx, emoji, ...errInfo(err), goiy: hint(err) });
+            const chain = emojis.reactionChain(i, g.id).filter(e => e !== emoji);
             let done = false;
             for (const fb of chain) {
                 try {
@@ -1437,12 +1445,12 @@ async function reactLegit(message, { rename = true, source = 'tin-moi' } = {}) {
                     done = true;
                     break;
                 } catch (err2) {
-                    log.warn('LEGIT', 'Emoji dự phòng cũng THẤT BẠI, thử cái tiếp theo', { ...ctx, emoji: fb, ...errInfo(err2), goiy: hint(err2) });
-                    if (fb === chain[chain.length - 1]) {
-                        results.push({ emoji, ok: false, code: err2.code });
-                        log.error('LEGIT', 'Mọi emoji dự phòng đều THẤT BẠI (không react được gì)', { ...ctx, emoji: fb, ...errInfo(err2), goiy: hint(err2) });
-                    }
+                    log.warn('LEGIT', 'Emoji dự phòng cũng THẤT BẠI', { ...ctx, emoji: fb, ...errInfo(err2), goiy: hint(err2) });
                 }
+            }
+            if (!done) {
+                results.push({ emoji, ok: false, code: err.code });
+                log.warn('LEGIT', `Bỏ qua vị trí ${i + 1}`, { ...ctx, emoji });
             }
         }
         await new Promise(r => setTimeout(r, 200));
@@ -1459,6 +1467,9 @@ async function reactLegit(message, { rename = true, source = 'tin-moi' } = {}) {
     }
 
     const okN = results.filter(r => r.ok).length;
+    // Không thả được cái nào: tin không có dấu reaction, phải ghi nhớ để lần quét khởi động không đếm lại
+    if (!okN && counting && number !== null) await rememberNoReact(g.id, message.id);
+
     const fbN = results.filter(r => r.fallback).length;
     const summary = `react ${okN}/${results.length}${fbN ? ` (${fbN} emoji thay thế)` : ''}${counting ? `, số legit #${number ?? '?'}` : ', tắt đếm'}`;
     (okN === results.length ? log.info : okN ? log.warn : log.error)('LEGIT', `Xong: ${summary}`, { ...ctx, ms: Date.now() - t0 });
@@ -1482,8 +1493,9 @@ async function scanLegitChannel(channel) {
     if (!msgs) return { reacted: 0, last: null };
 
     // Tin legit đúng mẫu mà bot CHƯA react, xử lý từ cũ đến mới để số legit đúng thứ tự
+    const counted = new Set(await noReactIds(channel.guildId));
     const todo = [...msgs.values()]
-        .filter(m => !m.author?.bot && isLegitMessage(m.content) && !hasMyReaction(m))
+        .filter(m => !m.author?.bot && isLegitMessage(m.content) && !hasMyReaction(m) && !counted.has(m.id))
         .sort((a, b) => (a.createdTimestamp || 0) - (b.createdTimestamp || 0));
     const matched = [...msgs.values()].filter(m => !m.author?.bot && isLegitMessage(m.content)).length;
     log.info('LEGIT', 'Quét khởi động: kết quả đọc kênh', { guildId: channel.guildId, channelId: channel.id, doc_duoc: msgs.size, dung_mau: matched, chua_react: todo.length });
@@ -2025,7 +2037,7 @@ client.on(Events.ChannelDelete || 'channelDelete', async channel => {
 });
 
 client.once(Events.ClientReady || 'ready', async () => {
-    emojis.setEmojiChecker(id => client.emojis.cache.has(id));   // emoji custom bot không thấy thì tạm dùng emoji thường (xem /emoji check)
+    emojis.setEmojiChecker(id => client.emojis.cache.has(id));   // emoji bot không thấy: nút / chữ dùng emoji thường, reaction legit bỏ qua (xem /emoji check)
     if (client.guilds?.cache) setGuildResolver(id => client.guilds.cache.get(id));   // cấu hình riêng từng server
     console.log(`🤖 Bot đã kết nối: ${client.user.tag}`);
     log.info('READY', 'Bot sẵn sàng', {

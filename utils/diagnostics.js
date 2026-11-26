@@ -65,7 +65,7 @@ async function diagnoseGuild(client, guild) {
     });
     const hidden = d.emojis.filter(e => e.custom && !e.visible);
     if (hidden.length) {
-        d.notes.push(`${hidden.length}/${d.emojis.length} emoji custom bot không thấy (${hidden.map(e => e.name).join(', ')}): bot sẽ thả emoji thường ${C.LEGIT_FALLBACK_REACTIONS.join(' ')} thay thế.`);
+        d.notes.push(`${hidden.length}/${d.emojis.length} emoji custom bot không thấy (${hidden.map(e => e.name).join(', ')}): bot sẽ bỏ qua các vị trí đó khi react.`);
     }
 
     // ---- Role mốc ----

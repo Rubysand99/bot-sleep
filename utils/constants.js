@@ -62,9 +62,6 @@ module.exports = {
         ).split(/[\s,]+/).filter(Boolean)
     ],
 
-    // Cuối cùng, nếu cả emoji dự phòng cũng lỗi thì dùng emoji thường này (vẫn luôn đủ số reaction)
-    LEGIT_FALLBACK_REACTIONS: ['✅', '☑️', '🟢', '✔️', '💚'],
-
     // Tên kênh legit = prefix + số (vd: 『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-632). Discord giới hạn đổi tên 2 lần / 10 phút
     // Đổi tên mà không cần sửa code bằng biến LEGIT_CHANNEL_PREFIX
     LEGIT_CHANNEL_PREFIX: fromEnv('LEGIT_CHANNEL_PREFIX', '『✅』𝙑𝙤𝙪𝙘𝙝𝙚𝙨-'),

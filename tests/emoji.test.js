@@ -52,15 +52,14 @@ t('effective: emoji custom bot KHÔNG thấy thì mới dùng emoji thường', 
     assert.strictEqual(e.usedFallback, true);
     assert.strictEqual(m.text('offline', 'G1') && typeof m.text('offline', 'G1'), 'string');
 });
-t('reaction legit: theo cấu hình server; chuỗi dự phòng = custom dự phòng trước, emoji thường sau cùng', () => {
+t('reaction legit: theo cấu hình server; chuỗi dự phòng chỉ gồm emoji custom, không có emoji thường', () => {
     const m = load();
     assert.strictEqual(m.legitConfigured('G1').length, 3);
     m.setOverride('G1', 'legit2', `<:Mine:${B}>`);
     assert.strictEqual(m.legitConfigured('G1')[1], `<:Mine:${B}>`);
     assert.notStrictEqual(m.legitConfigured('G2')[1], `<:Mine:${B}>`);
     const chain = m.reactionChain(2, 'G1');
-    assert.strictEqual(chain[chain.length - 1], '🟢', 'emoji thường nằm cuối cùng');
-    assert.ok(chain.length >= 2 && chain.slice(0, -1).every(e => m.parseEmoji(e)?.custom), 'trước đó toàn emoji custom');
+    assert.ok(chain.length >= 2 && chain.every(e => m.parseEmoji(e)?.custom), 'toàn emoji custom');
     assert.strictEqual(new Set(chain).size, chain.length, 'không trùng');
 });
 t('resolveInput: mã custom / ID / tên emoji / emoji thường', () => {
@@ -88,10 +87,10 @@ t('resolveInput: từ chối emoji bot không thấy, tên không tồn tại, v
         assert.ok(r.error && r.error.length > 10);
     }
 });
-t('mọi vị trí emoji đều có tên, nhãn và emoji thường dự phòng', () => {
+t('mọi vị trí emoji đang dùng đều có tên, nhãn và giá trị hợp lệ', () => {
     const m = load();
     assert.deepStrictEqual(m.SLOTS.map(s => s.key), ['online', 'offline', 'info', 'legit1', 'legit2', 'legit3', 'legit4', 'legit5']);
-    for (const s of m.SLOTS) {
+    for (const s of m.activeSlots()) {
         assert.ok(s.label);
         assert.strictEqual(m.parseEmoji(m.effective(s.key, 'G1').value) !== null, true, s.key);
     }
@@ -101,7 +100,12 @@ t('Zin Yeah Store (cartone): đúng 5 emoji legit theo thứ tự; drew giữ 3'
     const m = load();
     assert.deepStrictEqual(m.legitConfigured('G1').map(e => m.parseEmoji(e).id),
         ['1556987445437014116', '1575474437552087191', '1556987442869964911', '1575474728733376622', '1508127820415766588']);
-    assert.strictEqual(new Set([0, 1, 2, 3, 4].map(i => m.reactionChain(i, 'G1').at(-1))).size, 5, 'emoji thường dự phòng không trùng');
+    m.setEmojiChecker(() => false);
+    for (let i = 0; i < 5; i++) {
+        assert.strictEqual(m.reactionChain(i, 'G1').length, 1, 'không có emoji thay thế');
+        const e = m.effective(`legit${i + 1}`, 'G1');
+        assert.ok(e.skipped && e.value === '', 'không thấy thì bỏ qua');
+    }
     process.env.BOT_PROFILE = 'drew';
     assert.strictEqual(m.legitConfigured('G1').length, 3);
     assert.strictEqual(m.activeSlots().length, 6);

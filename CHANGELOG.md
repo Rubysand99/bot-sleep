@@ -2,6 +2,9 @@
 
 Mỗi bản cập nhật / sửa lỗi thêm 1 mục "## ..." Ở TRÊN CÙNG (mới nhất ở trên). Khi bot khởi động bản mới (version tự tăng), bot gửi embed các mục chưa thông báo vào kênh thông báo.
 
+## 26/11 · Bỏ qua emoji legit bot không thấy
+- Emoji legit nào bot không dùng được thì bỏ qua vị trí đó, không thay bằng emoji thường. Emoji custom dự phòng (bot Drew, vị trí 3) vẫn dùng.
+
 ## 26/11 · Đổi bộ emoji legit của bot Zin Yeah Store
 - Bot Zin Yeah Store react tin legit bằng bộ 5 emoji mới, theo đúng thứ tự. Bot Drew giữ nguyên.
 
