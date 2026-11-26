@@ -2,6 +2,9 @@
 
 Mỗi bản cập nhật / sửa lỗi thêm 1 mục "## ..." Ở TRÊN CÙNG (mới nhất ở trên). Khi bot khởi động bản mới (version tự tăng), bot gửi embed các mục chưa thông báo vào kênh thông báo.
 
+## 26/11 · Lệnh /test_stock
+- Thêm `/test_stock [username] [price] [rank] [capes]`: tạo thử ảnh stock GIF để xem trước (Staff/Owner, không đăng acc, kết quả chỉ mình bạn thấy).
+
 ## 26/11 · Embed giao acc theo mẫu, GIF có vệt sáng chạy
 - Embed DM giao acc viết lại theo mẫu: Username / Rank / Capes, rồi Primary Email / Recovery Code / Security Email / Password / Secret Key (ô trống = NON), dòng `+1 legit @seller giá username`, kèm nút TOS / Secure / Sec 2FA / Tránh Lock (link tới kênh đã đặt).
 - GIF stock thêm vệt sáng chạy ngang card để chuyển động luôn thấy rõ.

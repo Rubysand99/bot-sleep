@@ -1192,6 +1192,22 @@ const msgFor = (channel, authorId, content, member) => {
         assert.equal((await db.getTopCustomers(50)).find(c => c._id === CUST).totalSpent, 200000, 'sai cú pháp không cộng tiền');
         await db.saveSetting('LEADERBOARD_MESSAGE_PFX', null);
     });
+    await test('/test_stock: Staff nhận ảnh thử; người thường bị từ chối', async () => {
+        const cmd = require(path.join(root, 'commands/test_stock'));
+        const mk = (member, opts = {}) => {
+            const out = { replies: [], edits: [] };
+            return { out, it: { member, client, options: { getString: k => opts[k] ?? null },
+                async reply(p) { out.replies.push(p); }, async deferReply() {}, async editReply(p) { out.edits.push(p); } } };
+        };
+        const a = mk(staffMember(), { username: 'abc', price: '200k' });
+        await cmd.execute(a.it);
+        assert.equal(a.out.edits.length, 1);
+        assert.equal(a.out.edits[0].files[0].name, 'card.gif');
+        const b = mk(makeMember('800000000000000001', []));
+        await cmd.execute(b.it);
+        assert.ok(JSON.stringify(b.out.replies).includes('Staff'));
+        assert.equal(b.out.edits.length, 0);
+    });
     await test('.tien @user +số / -số: Staff cộng trừ tổng chi tiêu, không âm; khách thường bị từ chối; sai cú pháp báo hướng dẫn', async () => {
         const here = makeChannel('chat-tien', { id: '123123123123123198' });
         const CUST = '800000000000000077';

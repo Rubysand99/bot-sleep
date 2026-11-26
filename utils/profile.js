@@ -21,7 +21,7 @@ const COMMAND_FEATURE = {
     config: 'common', emoji: 'common', bot_avatar: 'common', staff: 'common', owner: 'common', sticky: 'common',
     set_kenhsold: 'sold', taokenh: 'sold', xoakenh: 'sold',
     leaderboard: 'bxh', done: 'bxh',
-    add_acc: 'autobuy', stock: 'autobuy', set_qr: 'autobuy', restock: 'autobuy', skin: 'autobuy', dang_anh: 'autobuy', moc_role: 'autobuy', payos: 'autobuy'
+    add_acc: 'autobuy', stock: 'autobuy', test_stock: 'autobuy', set_qr: 'autobuy', restock: 'autobuy', skin: 'autobuy', dang_anh: 'autobuy', moc_role: 'autobuy', payos: 'autobuy'
 };
 
 const FALLBACK = 'full';

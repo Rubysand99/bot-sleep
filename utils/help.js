@@ -38,16 +38,17 @@ function buildHelpEmbed(member) {
         const slash = pick([
             ['autobuy', '`/add_acc`: mở form dán thông tin tài khoản vào kho (bot mã hóa mật khẩu).'],
             ['autobuy', '`/stock acc sotien seller`: đăng card bán kèm nút BUY (thêm: nhapnhanh, capes, rank...).'],
-            ['autobuy', '`/set_qr bank_name account_number bank_type`: cài ngân hàng tạo VietQR (người thường: Owner xác nhận qua DM).'],
+            ['autobuy', '`/set_qr bank_name account_number bank_type`: cài ngân hàng tạo VietQR (người thường: Owner duyệt).'],
             ['autobuy', '`/payos set|xem|kiem_tra|xoa`: kênh payOS riêng, bot tự nhận tiền và giao acc.'],
+            ['autobuy', '`/test_stock`: tạo thử ảnh stock (không đăng acc).'],
             ['autobuy', '`/restock`: đăng danh sách các kênh đang còn hàng.'],
             ['bxh', '`/done customer amount`: ghi doanh thu thủ công' + (profile.has('autobuy') ? ' (không dùng nếu đã Confirm).' : '.')],
             ['bxh', '`/leaderboard`: bảng xếp hạng khách mua nhiều nhất.'],
             ['common', '`/sticky set|remove`: ghim tin nhắn tự động ở kênh.'],
-            ['common', '`/emoji check|set|reset|list`: kiểm tra / đặt các emoji bot dùng (ưu tiên emoji custom, lưu riêng từng server).'],
-            ['autobuy', '`/dang_anh image price`: đăng acc Liên Quân chỉ với ảnh + giá (như `/stock acc`, không Note).'],
+            ['common', '`/emoji check|set|reset|list`: kiểm tra / đặt emoji bot dùng (riêng từng server).'],
+            ['autobuy', '`/dang_anh image price`: đăng acc Liên Quân chỉ với ảnh + giá (không Note).'],
             ['autobuy', '`/skin username`: xem skin Minecraft.'],
-            ['sold', '`/taokenh ten danhmuc`, `/xoakenh kenh|id`: tạo / xóa kênh (slash: chọn danh mục ngay trong lệnh).'],
+            ['sold', '`/taokenh ten danhmuc`, `/xoakenh kenh|id`: tạo / xóa kênh .'],
             ['autobuy', 'Trong ticket: nút **Confirm** và nút **Gửi lại thông tin**.']
         ]);
         if (prefix.length) embed.addFields({ name: '💬 Staff / Owner: lệnh prefix', value: prefix.join('\n') });

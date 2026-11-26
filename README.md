@@ -7,7 +7,7 @@ Cùng một code, mỗi server một bot riêng (token riêng), chọn bằng bi
 
 | Tính năng | `drew` (server Drew) | `cartone` (server Cartone) |
 |---|---|---|
-| Auto buy (BUY, ticket, Confirm, kho acc, VietQR, `/stock`, `/dang_anh`, `/add_acc`, `/set_qr`, `/payos`, `/restock`, `/skin`, `/moc_role`, `.panel`, `.close`, `.resend`, `.vietqr`, nhắc vouch) | ✅ | ✅ |
+| Auto buy (BUY, ticket, Confirm, kho acc, VietQR, `/stock`, `/test_stock`, `/dang_anh`, `/add_acc`, `/set_qr`, `/payos`, `/restock`, `/skin`, `/moc_role`, `.panel`, `.close`, `.resend`, `.vietqr`, nhắc vouch) | ✅ | ✅ |
 | Bảng xếp hạng + ghi doanh thu (`.bxh`, `/leaderboard`, `.done`, `/done`), **dữ liệu riêng từng server** | ✅ | ✅ |
 | `sold`, `/set_kenhsold`, `.taokenh`, `.xoakenh` | ✅ | ✅ |
 | Auto react legit (3 emoji) | ✅ | ✅ |
@@ -139,7 +139,7 @@ Bot cần quyền **Manage Roles** và role của bot phải nằm **cao hơn** 
 **Slash**
 | Lệnh | Ai dùng |
 |---|---|
-| `/add_acc`, `/stock acc`, `/dang_anh`, `/set_qr`, `/payos`, `/restock`, `/done`, `/leaderboard`, `/sticky set\|remove`, `/skin`, `/taokenh ten [danhmuc]`, `/xoakenh kenh\|id` | Staff/Owner |
+| `/add_acc`, `/stock acc`, `/test_stock`, `/dang_anh`, `/set_qr`, `/payos`, `/restock`, `/done`, `/leaderboard`, `/sticky set\|remove`, `/skin`, `/taokenh ten [danhmuc]`, `/xoakenh kenh\|id` | Staff/Owner |
 | `/set_kenhsold`, `/config set\|clear\|show\|role_done\|debug\|legit_dem\|legit_count\|check_emoji`, `/staff add\|remove\|list\|role`, `/moc_role add\|remove\|list\|che_do\|sync\|kiemtra` | Owner |
 | `/owner list`, `/bot_avatar [doi_ten]` | Owner |
 | `/owner add\|remove` | Owner gốc (`OWNER_ID`) |
