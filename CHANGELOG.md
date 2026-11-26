@@ -2,6 +2,9 @@
 
 Mỗi bản cập nhật / sửa lỗi thêm 1 mục "## ..." Ở TRÊN CÙNG (mới nhất ở trên). Khi bot khởi động bản mới (version tự tăng), bot gửi embed các mục chưa thông báo vào kênh thông báo.
 
+## 26/11 · Đổi bộ emoji legit của bot Zin Yeah Store
+- Bot Zin Yeah Store react tin legit bằng bộ 5 emoji mới, theo đúng thứ tự. Bot Drew giữ nguyên.
+
 ## 26/11 · Phản hồi lệnh slash hiện công khai
 - Mọi phản hồi của lệnh slash (kể cả báo lỗi, từ chối quyền) giờ ai trong kênh cũng thấy. Phản hồi khi bấm nút vẫn chỉ người bấm thấy.
 

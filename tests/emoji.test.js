@@ -100,7 +100,7 @@ t('Zin Yeah Store (cartone): đúng 5 emoji legit theo thứ tự; drew giữ 3'
     process.env.BOT_PROFILE = 'cartone';
     const m = load();
     assert.deepStrictEqual(m.legitConfigured('G1').map(e => m.parseEmoji(e).id),
-        ['1519460742443569293', '1534924144431337644', '1556987442869964911', '1507043298198556723', '1544237808582131762']);
+        ['1556987445437014116', '1575474437552087191', '1556987442869964911', '1575474728733376622', '1508127820415766588']);
     assert.strictEqual(new Set([0, 1, 2, 3, 4].map(i => m.reactionChain(i, 'G1').at(-1))).size, 5, 'emoji thường dự phòng không trùng');
     process.env.BOT_PROFILE = 'drew';
     assert.strictEqual(m.legitConfigured('G1').length, 3);

@@ -41,11 +41,11 @@ module.exports = {
 
     // Bot Zin Yeah Store (BOT_PROFILE=cartone) thả 5 emoji, ĐÚNG THỨ TỰ này. LEGIT_REACT_EMOJIS (nếu đặt) ghi đè theo từng vị trí
     ZIN_LEGIT_REACTIONS: [
-        '<a:CanhXanh:1519460742443569293>',
-        '<:tryingnottolaughblueemojiblue:1534924144431337644>',
+        '<a:CanhXanh:1556987445437014116>',
+        '<:tryingnottolaughblueemojiblue:1575474437552087191>',
         '<a:CanhXanh:1556987442869964911>',
-        '<a:legit:1507043298198556723>',
-        '<a:85322greencheck:1544237808582131762>'
+        '<a:Legit:1575474728733376622>',
+        '<a:emoji_33:1508127820415766588>'
     ],
 
     // Emoji "tiền" bot thả thêm vào tin legit của khách đã mua hàng (done / Confirm). Đổi bằng biến LEGIT_MONEY_EMOJI, đặt `off` để tắt
