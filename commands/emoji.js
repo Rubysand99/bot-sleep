@@ -1,10 +1,9 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { isOwnerId } = require('../utils/permissions');
 const { setEmojiSlot } = require('../utils/config');
 const emojis = require('../utils/emojis');
 
 const slotChoices = emojis.activeSlots().map(s => ({ name: `${s.key} · ${s.label}`.slice(0, 100), value: s.key }));
-const EPHEMERAL = MessageFlags.Ephemeral;
 const SRC = { server: 'đặt bằng `/emoji set`', mac_dinh: 'mặc định của bot' };
 
 // Mô tả trạng thái 1 vị trí emoji cho /emoji check
@@ -36,10 +35,10 @@ module.exports = {
 
     async execute(interaction) {
         if (!isOwnerId(interaction.user.id, interaction.guild)) {
-            return await interaction.reply({ content: '❌ Lệnh này chỉ dành riêng cho Owner!', flags: EPHEMERAL });
+            return await interaction.reply({ content: '❌ Lệnh này chỉ dành riêng cho Owner!', allowedMentions: { parse: [] } });
         }
         if (!interaction.guildId) {
-            return await interaction.reply({ content: '❌ Emoji được cấu hình riêng từng server, hãy dùng lệnh này trong server.', flags: EPHEMERAL });
+            return await interaction.reply({ content: '❌ Emoji được cấu hình riêng từng server, hãy dùng lệnh này trong server.', allowedMentions: { parse: [] } });
         }
         const sub = interaction.options.getSubcommand();
         const gid = interaction.guildId;
@@ -63,20 +62,20 @@ module.exports = {
                         'Đặt emoji: `/emoji set` · Xem emoji có sẵn: `/emoji list` · Về mặc định: `/emoji reset`'
                     ].filter(Boolean).join('\n')
                 });
-            return await interaction.reply({ embeds: [embed], flags: EPHEMERAL });
+            return await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
         }
 
         if (sub === 'list') {
             const list = [...(interaction.guild?.emojis?.cache?.values?.() || [])].sort((a, b) => String(a.name).localeCompare(String(b.name)));
             if (!list.length) {
-                return await interaction.reply({ content: 'Server này chưa có emoji custom nào. Hãy up emoji vào server (Cài đặt server → Emoji) rồi dùng `/emoji set`.', flags: EPHEMERAL });
+                return await interaction.reply({ content: 'Server này chưa có emoji custom nào. Hãy up emoji vào server (Cài đặt server → Emoji) rồi dùng `/emoji set`.', allowedMentions: { parse: [] } });
             }
             const shown = list.slice(0, 60);
             const body = shown.map(e => `${e} \`${e.name}\``).join('  ·  ');
             return await interaction.reply({
                 content: `**Emoji custom của server (${list.length})**\n${body}${list.length > shown.length ? `\n…và ${list.length - shown.length} emoji khác.` : ''}\n\n` +
                     'Đặt bằng `/emoji set vitri:<vị trí> emoji:<tên emoji>`.',
-                flags: EPHEMERAL, allowedMentions: { parse: [] }
+                allowedMentions: { parse: [] }
             });
         }
 
@@ -84,8 +83,8 @@ module.exports = {
             const slotKey = interaction.options.getString('vitri');
             const slot = emojis.slotOf(slotKey);
             const r = emojis.resolveInput(interaction.options.getString('emoji'), interaction.client, interaction.guild);
-            if (!slot) return await interaction.reply({ content: '❌ Vị trí không hợp lệ.', flags: EPHEMERAL });
-            if (!r.ok) return await interaction.reply({ content: `❌ ${r.error}`, flags: EPHEMERAL });
+            if (!slot) return await interaction.reply({ content: '❌ Vị trí không hợp lệ.', allowedMentions: { parse: [] } });
+            if (!r.ok) return await interaction.reply({ content: `❌ ${r.error}`, allowedMentions: { parse: [] } });
             await setEmojiSlot(gid, slotKey, r.value);
             const note = r.custom
                 ? `Bot thấy emoji này${r.guildName ? ` (thuộc server **${r.guildName}**)` : ''}.`
@@ -93,7 +92,7 @@ module.exports = {
             return await interaction.reply({
                 content: `✅ Đã đặt **${slot.key}** (${slot.label}) = ${r.value} · chỉ áp dụng cho server **${interaction.guild?.name || gid}**.\n${note}` +
                     (slot.kind === 'button' ? '\nCard đã đăng sẽ đổi emoji khi card được cập nhật (đang giao dịch / đã bán); card mới dùng ngay.' : ''),
-                flags: EPHEMERAL
+                allowedMentions: { parse: [] }
             });
         }
 
@@ -103,7 +102,7 @@ module.exports = {
             for (const k of keys) if (emojis.slotOf(k)) await setEmojiSlot(gid, k, null);
             return await interaction.reply({
                 content: `✅ Đã đưa ${slotKey === 'all' ? '**tất cả** vị trí' : `**${slotKey}**`} về emoji mặc định cho server này.`,
-                flags: EPHEMERAL
+                allowedMentions: { parse: [] }
             });
         }
     }

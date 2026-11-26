@@ -1,5 +1,5 @@
 const {
-    SlashCommandBuilder, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder
+    SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder
 } = require('discord.js');
 const db = require('../utils/db');
 const payos = require('../utils/payos');
@@ -25,7 +25,7 @@ function canManage(interaction, targetId) {
 
 const deny = (interaction) => interaction.reply({
     content: '❌ Bạn chỉ quản lý được kênh payOS của chính mình (Staff/Owner). Chỉ Owner mới thao tác hộ người khác.',
-    flags: MessageFlags.Ephemeral
+    allowedMentions: { parse: [] }
 });
 
 function buildModal(targetId) {
@@ -52,9 +52,9 @@ async function handleModal(interaction) {
         checksumKey: interaction.fields.getTextInputValue('checksum_key').trim()
     };
     if (Object.values(creds).some(v => !v || /\s/.test(v))) {
-        return interaction.reply({ content: '❌ Khóa không được để trống hoặc có khoảng trắng.', flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: '❌ Khóa không được để trống hoặc có khoảng trắng.', allowedMentions: { parse: [] } });
     }
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await interaction.deferReply();
     try {
         await payos.testChannel(creds);
     } catch (err) {
@@ -72,7 +72,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('payos')
         .setDescription('Kênh payOS: bot tự kiểm tra khách đã chuyển khoản và tự giao acc')
-        .addSubcommand(s => s.setName('set').setDescription('Nhập khóa kênh payOS (form riêng tư)')
+        .addSubcommand(s => s.setName('set').setDescription('Nhập khóa kênh payOS (mở form nhập)')
             .addUserOption(o => o.setName('seller').setDescription('Seller cần cài (chỉ Owner chọn người khác)')))
         .addSubcommand(s => s.setName('xem').setDescription('Xem seller đã cài payOS chưa (không hiện khóa)')
             .addUserOption(o => o.setName('seller').setDescription('Seller cần xem')))
@@ -95,11 +95,11 @@ module.exports = {
             return interaction.reply({
                 content: has ? `✅ <@${target.id}> **đã cài** kênh payOS: đơn của người này tự động xác nhận.`
                              : `⚠️ <@${target.id}> **chưa cài** kênh payOS: đơn dùng VietQR + Confirm tay.\n${PAYOS_HELP}\nDùng \`/payos set\` để nhập khóa.`,
-                flags: MessageFlags.Ephemeral
+                allowedMentions: { parse: [] }
             });
         }
         if (sub === 'kiem_tra') {
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            await interaction.deferReply();
             const creds = await db.getPayosChannel(target.id);
             if (!creds) return interaction.editReply({ content: `⚠️ <@${target.id}> chưa cài kênh payOS (\`/payos set\`).` });
             try { await payos.testChannel(creds); }
@@ -111,7 +111,7 @@ module.exports = {
             return interaction.reply({
                 content: ok ? `🗑️ Đã xóa kênh payOS của <@${target.id}>. Đơn mới sẽ dùng VietQR + Confirm tay (đơn đang chờ vẫn được bot theo dõi).`
                             : `ℹ️ <@${target.id}> chưa có kênh payOS.`,
-                flags: MessageFlags.Ephemeral
+                allowedMentions: { parse: [] }
             });
         }
     }

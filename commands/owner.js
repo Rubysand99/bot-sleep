@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { isOwnerId, isPrimaryOwner } = require('../utils/permissions');
 const { getExtraOwners } = require('../utils/runtime');
 const { addOwnerUser, removeOwnerUser } = require('../utils/config');
@@ -14,7 +14,7 @@ module.exports = {
         .addSubcommand(sub => sub.setName('list').setDescription('Xem danh sách Owner')),
 
     async execute(interaction) {
-        const reply = (content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
+        const reply = (content) => interaction.reply({ content, allowedMentions: { parse: [] } });
         if (!interaction.guildId) return await reply('❌ Owner phụ được quản lý riêng từng server, hãy dùng lệnh này trong server cần cấu hình.');
         if (!isOwnerId(interaction.user.id, interaction.guild)) return await reply('❌ Lệnh này chỉ dành cho Owner!');
 
@@ -30,7 +30,7 @@ module.exports = {
                     `**Owner phụ ở server này (${owners.length}):**\n` +
                     (owners.length ? owners.map(id => `• <@${id}>`).join('\n') : '*(trống)*'))
                 .setFooter({ text: require('../utils/profile').current().name });
-            return await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            return await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
         }
 
         // Thêm / bớt Owner: chỉ Owner gốc (OWNER_ID), Owner phụ không thể tự mở rộng hay xóa Owner gốc

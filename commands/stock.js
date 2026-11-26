@@ -5,8 +5,7 @@ const {
     ButtonBuilder, 
     ButtonStyle, 
     ChannelType,
-    EmbedBuilder, 
-    MessageFlags,
+    EmbedBuilder,
     PermissionFlagsBits,
     OverwriteType 
 } = require('discord.js');
@@ -75,7 +74,7 @@ async function runStock(interaction) {
         if (!canSell(interaction.member)) {
             return await interaction.reply({ 
                 content: '❌ Bạn không có quyền đăng bán tài khoản (chỉ dành cho Owner, Staff hoặc Seller)!', 
-                flags: MessageFlags.Ephemeral 
+                allowedMentions: { parse: [] } 
             });
         }
 
@@ -210,12 +209,12 @@ async function runStock(interaction) {
                     content: '⚠️ Tài khoản này **chưa có thông tin đăng nhập** trong kho. ' +
                              'Hãy nhập thêm `password`, `primaryemail`... (hoặc dùng `/add_acc`), nếu không khi khách mua bot sẽ không tự gửi DM được.' +
                              (hasName ? '' : `\nMã acc trong kho: \`${accountKey}\` (card hiện NON).`),
-                    flags: MessageFlags.Ephemeral
+                    allowedMentions: { parse: [] }
                 }).catch(() => null);
             } else if (!hasName) {
                 await interaction.followUp({
                     content: `ℹ️ Mã acc trong kho: \`${accountKey}\` (card hiện NON).`,
-                    flags: MessageFlags.Ephemeral
+                    allowedMentions: { parse: [] }
                 }).catch(() => null);
             }
 

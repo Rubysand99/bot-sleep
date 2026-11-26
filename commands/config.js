@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags, PermissionFlagsBits, ChannelType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const db = require('../utils/db');
 const C = require('../utils/constants');
 const { isOwnerId } = require('../utils/permissions');
@@ -34,11 +34,11 @@ module.exports = {
 
     async execute(interaction) {
         if (!isOwnerId(interaction.user.id, interaction.guild)) {
-            return await interaction.reply({ content: '❌ Lệnh này chỉ dành riêng cho Owner!', flags: MessageFlags.Ephemeral });
+            return await interaction.reply({ content: '❌ Lệnh này chỉ dành riêng cho Owner!', allowedMentions: { parse: [] } });
         }
         const sub = interaction.options.getSubcommand();
         if (['set', 'clear', 'show', 'role_done'].includes(sub) && !interaction.guildId) {
-            return await interaction.reply({ content: '❌ Cấu hình riêng từng server, hãy dùng lệnh này trong server cần cấu hình.', flags: MessageFlags.Ephemeral });
+            return await interaction.reply({ content: '❌ Cấu hình riêng từng server, hãy dùng lệnh này trong server cần cấu hình.', allowedMentions: { parse: [] } });
         }
         const label = (value) => (CONFIG_KEYS.find(k => k.value === value) || {}).name || value;
 
@@ -50,14 +50,14 @@ module.exports = {
                 return await interaction.reply({
                     content: `❌ **${label(key)}** phải là một **danh mục (category)**, nhưng <#${channel.id}> là kênh thường. ` +
                         'Hãy chọn đúng danh mục (biểu tượng thư mục, tên thường viết HOA) trong ô `kenh`.',
-                    flags: MessageFlags.Ephemeral
+                    allowedMentions: { parse: [] }
                 });
             }
             // Kênh legit lưu RIÊNG theo server (mỗi server 1 kênh legit), không ghi đè mục chung của server khác
             if (key === 'AUTOREACTER_VOUCH') await setLegitChannel(channel.guildId || interaction.guildId, channel.id);
             else await setConfig(key, channel.id, interaction.guildId);
             return await interaction.reply({
-                content: `✅ Đã đặt **${label(key)}** = <#${channel.id}> (\`${channel.id}\`) · chỉ áp dụng cho server **${interaction.guild?.name || interaction.guildId}**`, flags: MessageFlags.Ephemeral
+                content: `✅ Đã đặt **${label(key)}** = <#${channel.id}> (\`${channel.id}\`) · chỉ áp dụng cho server **${interaction.guild?.name || interaction.guildId}**`, allowedMentions: { parse: [] }
             });
         }
 
@@ -65,10 +65,10 @@ module.exports = {
             const role = interaction.options.getRole('role');
             if (!role) {
                 await setConfig('DONE_ROLE_ID', null, interaction.guildId);
-                return await interaction.reply({ content: '✅ Đã **tắt** tặng role khi done đơn ở server này.', flags: MessageFlags.Ephemeral });
+                return await interaction.reply({ content: '✅ Đã **tắt** tặng role khi done đơn ở server này.', allowedMentions: { parse: [] } });
             }
             if (role.managed || role.id === interaction.guildId) {
-                return await interaction.reply({ content: '❌ Không dùng được role này (role của bot / tích hợp hoặc @everyone). Hãy chọn role thường.', flags: MessageFlags.Ephemeral });
+                return await interaction.reply({ content: '❌ Không dùng được role này (role của bot / tích hợp hoặc @everyone). Hãy chọn role thường.', allowedMentions: { parse: [] } });
             }
             await setConfig('DONE_ROLE_ID', role.id, interaction.guildId);
             const me = interaction.guild?.members?.me;
@@ -77,7 +77,7 @@ module.exports = {
                 : '';
             return await interaction.reply({
                 content: `✅ Mỗi khi done 1 đơn, bot sẽ tặng <@&${role.id}> cho khách (đã có thì bỏ qua) · chỉ áp dụng cho server **${interaction.guild?.name || interaction.guildId}**.${warn}`,
-                flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] }
+                allowedMentions: { parse: [] }
             });
         }
 
@@ -87,13 +87,13 @@ module.exports = {
             else await setConfig(key, null, interaction.guildId);
             return await interaction.reply({
                 content: `✅ Đã xóa cài đặt **${label(key)}** của server này (server khác không bị ảnh hưởng).`,
-                flags: MessageFlags.Ephemeral
+                allowedMentions: { parse: [] }
             });
         }
 
         if (sub === 'debug') {
-            if (!interaction.guild) return await interaction.reply({ content: '❌ Lệnh này chỉ dùng trong server.', flags: MessageFlags.Ephemeral });
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            if (!interaction.guild) return await interaction.reply({ content: '❌ Lệnh này chỉ dùng trong server.', allowedMentions: { parse: [] } });
+            await interaction.deferReply();
             const d = await diagnoseGuild(interaction.client, interaction.guild);
             let text = formatDiagnosis(d, { discord: true });
             if (text.length > 1950) text = text.slice(0, 1950) + '…';
@@ -101,7 +101,7 @@ module.exports = {
         }
 
         if (sub === 'check_emoji') {
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            await interaction.deferReply();
             const lines = [];
             for (const emoji of emojis.legitConfigured(interaction.guildId)) {
                 const m = String(emoji).match(/^<a?:(\w+):(\d+)>$/);
@@ -132,7 +132,7 @@ module.exports = {
 
         if (sub === 'legit_dem') {
             if (!interaction.guildId) {
-                return await interaction.reply({ content: '❌ Lệnh này chỉ dùng trong server.', flags: MessageFlags.Ephemeral });
+                return await interaction.reply({ content: '❌ Lệnh này chỉ dùng trong server.', allowedMentions: { parse: [] } });
             }
             const on = interaction.options.getString('trangthai') === 'on';
             await setLegitEnabled(interaction.guildId, on);
@@ -140,13 +140,13 @@ module.exports = {
                 content: on
                     ? '✅ Đã **BẬT** đếm số legit cho server này (bot đếm, react emoji và đổi tên kênh theo số legit).'
                     : '⏸️ Đã **TẮT** đếm số legit cho server này (bot vẫn react emoji, không đếm số và không đụng đến tên kênh).',
-                flags: MessageFlags.Ephemeral
+                allowedMentions: { parse: [] }
             });
         }
 
         if (sub === 'legit_count') {
             const shown = interaction.options.getInteger('so');
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            await interaction.deferReply();
             await db.saveSetting(`LEGIT_COUNT_${interaction.guildId}`, shown + 1);   // số của lần legit KẾ TIẾP, riêng theo server
             let renamed = false;
             const legitId = legitChannelFor(interaction.guildId);
@@ -171,6 +171,6 @@ module.exports = {
             .setColor('#00FFAA')
             .setDescription(lines.join('\n') + `\n• **Role tặng khi done đơn**: ${cfg('DONE_ROLE_ID', interaction.guild) ? `<@&${cfg('DONE_ROLE_ID', interaction.guild)}>` : '*(chưa đặt, dùng `/config role_done`)*'}` + `\n• **Đếm số legit (server này)**: ${isLegitEnabled(interaction.guildId) ? '🟢 Bật' : '🔴 Tắt'}`)
             .setFooter({ text: `Tên kênh legit: ${C.LEGIT_CHANNEL_PREFIX}<số>` });
-        await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
     }
 };

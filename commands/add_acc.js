@@ -3,8 +3,7 @@ const {
     ModalBuilder, 
     TextInputBuilder, 
     TextInputStyle, 
-    ActionRowBuilder,
-    MessageFlags
+    ActionRowBuilder
 } = require('discord.js');
 const { checkStaffOrOwner } = require('../utils/permissions');
 
@@ -17,7 +16,7 @@ module.exports = {
         if (!checkStaffOrOwner(interaction.member)) {
             return await interaction.reply({
                 content: '❌ Bạn không có quyền sử dụng lệnh này (Chỉ dành cho Owner hoặc Staff)!',
-                flags: MessageFlags.Ephemeral
+                allowedMentions: { parse: [] }
             });
         }
 

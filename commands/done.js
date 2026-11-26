@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../utils/db');
 const { parseAmount, formatVND } = require('../utils/money');
 const { checkStaffOrOwner } = require('../utils/permissions');
@@ -100,7 +100,7 @@ module.exports = {
         if (!checkStaffOrOwner(interaction.member)) {
             return await interaction.reply({
                 content: '❌ Lệnh này chỉ dành cho Staff hoặc Owner!',
-                flags: MessageFlags.Ephemeral
+                allowedMentions: { parse: [] }
             });
         }
 
@@ -112,7 +112,7 @@ module.exports = {
             user: interaction.user,
             client: interaction.client
         });
-        if (!result.ok) return await interaction.reply({ content: result.msg, flags: MessageFlags.Ephemeral });
+        if (!result.ok) return await interaction.reply({ content: result.msg, allowedMentions: { parse: [] } });
 
         await interaction.reply({ embeds: [result.embed] });
         // Mỗi lần done 1 đơn là bảng xếp hạng được sửa lại ngay

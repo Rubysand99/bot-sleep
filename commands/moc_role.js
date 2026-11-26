@@ -1,11 +1,10 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../utils/db');
 const { parseAmount, formatVND } = require('../utils/money');
 const { isOwnerId } = require('../utils/permissions');
 const M = require('../utils/milestones');
 const { log } = require('../utils/logger');
 
-const EPHEMERAL = MessageFlags.Ephemeral;
 const AMOUNT_HELP = 'Số tiền mốc, vd: 500k, 1tr, 2.000.000';
 
 // Role này bot có gán được không? (không phải @everyone, không phải role của bot/integration, và nằm THẤP hơn role cao nhất của bot)
@@ -41,10 +40,10 @@ module.exports = {
 
     async execute(interaction) {
         if (!isOwnerId(interaction.user.id, interaction.guild)) {
-            return await interaction.reply({ content: '❌ Lệnh này chỉ dành riêng cho Owner!', flags: EPHEMERAL });
+            return await interaction.reply({ content: '❌ Lệnh này chỉ dành riêng cho Owner!', allowedMentions: { parse: [] } });
         }
         if (!interaction.guild) {
-            return await interaction.reply({ content: '❌ Lệnh này chỉ dùng trong server.', flags: EPHEMERAL });
+            return await interaction.reply({ content: '❌ Lệnh này chỉ dùng trong server.', allowedMentions: { parse: [] } });
         }
         const guild = interaction.guild;
         const sub = interaction.options.getSubcommand();
@@ -53,10 +52,10 @@ module.exports = {
         if (sub === 'add') {
             const amount = parseAmount(interaction.options.getString('tien'));
             const role = interaction.options.getRole('role');
-            if (amount <= 0) return await interaction.reply({ content: '❌ Số tiền mốc không hợp lệ.', flags: EPHEMERAL });
+            if (amount <= 0) return await interaction.reply({ content: '❌ Số tiền mốc không hợp lệ.', allowedMentions: { parse: [] } });
             const problem = roleProblem(guild, role);
             if (problem && /everyone|quản lý/.test(problem)) {
-                return await interaction.reply({ content: `❌ Không dùng được role này: ${problem}.`, flags: EPHEMERAL });
+                return await interaction.reply({ content: `❌ Không dùng được role này: ${problem}.`, allowedMentions: { parse: [] } });
             }
             const r = await M.addTier(guild.id, amount, role.id);
             return await interaction.reply({
@@ -64,7 +63,7 @@ module.exports = {
                     (r.replacedRole && r.replacedRole !== role.id ? ` (đã thay role cũ <@&${r.replacedRole}> của mốc này)` : '') +
                     `\nServer này hiện có **${r.total}** mốc. Dùng \`/moc_role sync\` để cấp bù cho khách đã mua từ trước.` +
                     (problem ? `\n⚠️ **Lưu ý:** ${problem}. Chưa sửa thì bot sẽ không cấp được role này.` : ''),
-                allowedMentions: { parse: [] }, flags: EPHEMERAL
+                allowedMentions: { parse: [] }
             });
         }
 
@@ -73,7 +72,7 @@ module.exports = {
             const ok = await M.removeTier(guild.id, amount);
             return await interaction.reply({
                 content: ok ? `✅ Đã xóa mốc **${formatVND(amount)}** (role đã cấp cho khách vẫn giữ nguyên).` : `⚠️ Không có mốc nào là **${formatVND(amount)}**.`,
-                flags: EPHEMERAL
+                allowedMentions: { parse: [] }
             });
         }
 
@@ -83,7 +82,7 @@ module.exports = {
                 content: mode === 'replace'
                     ? '✅ Chế độ **chỉ giữ role mốc cao nhất**: khi khách lên mốc mới, bot gỡ role mốc thấp hơn (áp dụng ở lần cấp / sync kế tiếp).'
                     : '✅ Chế độ **giữ tất cả role các mốc đã đạt**.',
-                flags: EPHEMERAL
+                allowedMentions: { parse: [] }
             });
         }
 
@@ -101,7 +100,7 @@ module.exports = {
                 .setDescription(cfg.tiers.length ? lines.join('\n') : '*(chưa có mốc nào, dùng `/moc_role add`)*')
                 .addFields({ name: 'Chế độ', value: cfg.mode === 'replace' ? 'Chỉ giữ role mốc cao nhất' : 'Giữ tất cả role các mốc đã đạt' },
                     { name: 'Quyền Manage Roles của bot', value: me?.permissions.has(PermissionFlagsBits.ManageRoles) ? '✅ Có' : '❌ Chưa có' });
-            return await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] }, flags: EPHEMERAL });
+            return await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
         }
 
         if (sub === 'kiemtra') {
@@ -117,12 +116,12 @@ module.exports = {
                     `${member ? '' : '⚠️ Khách này **không ở trong server này** nên không cấp role được.\n'}` +
                     `${plan.add.length ? `⏳ Chưa có role: ${plan.add.map(t => `<@&${t.roleId}>`).join(', ')} (chạy \`/moc_role sync\`)\n` : ''}` +
                     `${plan.next ? `➡️ Mốc kế tiếp: **${formatVND(plan.next.amount)}** (còn thiếu ${formatVND(plan.next.amount - total)})` : '🏁 Đã đạt mốc cao nhất'}`,
-                allowedMentions: { parse: [] }, flags: EPHEMERAL
+                allowedMentions: { parse: [] }
             });
         }
 
         // sync
-        await interaction.deferReply({ flags: EPHEMERAL });
+        await interaction.deferReply();
         const cfg = await M.getConfig(guild.id);
         if (!cfg.tiers.length) return await interaction.editReply({ content: '⚠️ Server này chưa có mốc nào (dùng `/moc_role add`).' });
         const customers = await db.getAllCustomers();

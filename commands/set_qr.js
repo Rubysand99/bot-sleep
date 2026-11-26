@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const { saveStaffQR } = require('../utils/db');
 const { isOwnerId } = require('../utils/permissions');
 const { resolveBankCode } = require('../utils/vietqr');
@@ -27,7 +27,7 @@ module.exports = {
         const bankType = interaction.options.getString('bank_type').trim().toUpperCase();
 
         if (!/^\d{6,20}$/.test(accountNumber)) {
-            return await interaction.reply({ content: '❌ Số tài khoản không hợp lệ (chỉ gồm 6-20 chữ số).', flags: MessageFlags.Ephemeral });
+            return await interaction.reply({ content: '❌ Số tài khoản không hợp lệ (chỉ gồm 6-20 chữ số).', allowedMentions: { parse: [] } });
         }
 
         // Owner tự cài thì có hiệu lực ngay (chính Owner là người xác nhận)
@@ -37,12 +37,12 @@ module.exports = {
                 content: `✅ **Đã cập nhật thông tin VietQR của bạn thành công!**\n` +
                          `🏦 **Ngân hàng:** ${bankName}\n💳 **Số tài khoản:** ${accountNumber}\n👤 **Chủ tài khoản:** ${bankType}\n` +
                          `*Khi khách bấm mua đơn hàng do bạn đăng, bot sẽ tự động tạo mã VietQR theo thông tin này!*`,
-                flags: MessageFlags.Ephemeral
+                allowedMentions: { parse: [] }
             });
         }
 
         // Người thường: gửi Owner xác nhận, chưa lưu cho tới khi Owner bấm xác nhận
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferReply();
         const res = await submitQrRequest({ client: interaction.client, guild: interaction.guild, userId: interaction.user.id, bankName, accountNumber, bankType });
         const info = `🏦 **Ngân hàng:** ${bankName}\n💳 **Số tài khoản:** ${accountNumber}\n👤 **Chủ tài khoản:** ${bankType}`;
         if (!res.delivered) {

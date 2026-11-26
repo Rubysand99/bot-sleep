@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../utils/db');
 const { stickyCache } = require('../utils/cache');
 
@@ -34,11 +34,11 @@ module.exports = {
                 .setTitle('📌 Thiết lập Sticky Message thành công!')
                 .setDescription(content);
 
-            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
         } else if (sub === 'remove') {
             await db.saveSetting(`STICKY_${channelId}`, null);
             stickyCache.delete(channelId);
-            await interaction.reply({ content: '✅ Đã xóa Sticky Message của kênh này!', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: '✅ Đã xóa Sticky Message của kênh này!', allowedMentions: { parse: [] } });
         }
     }
 };

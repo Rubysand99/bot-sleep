@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, AttachmentBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const cardGif = require('../utils/cardGif');
 const { checkStaffOrOwner } = require('../utils/permissions');
 const { parseAmount } = require('../utils/money');
@@ -15,9 +15,9 @@ module.exports = {
 
     async execute(interaction) {
         if (!checkStaffOrOwner(interaction.member)) {
-            return await interaction.reply({ content: '❌ Lệnh này chỉ dành cho Staff hoặc Owner!', flags: MessageFlags.Ephemeral });
+            return await interaction.reply({ content: '❌ Lệnh này chỉ dành cho Staff hoặc Owner!', allowedMentions: { parse: [] } });
         }
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferReply();
         const get = (k, d) => (interaction.options.getString(k) || '').trim() || d;
         try {
             const user = interaction.client.user;

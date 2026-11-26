@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const { isOwnerId } = require('../utils/permissions');
 const profile = require('../utils/profile');
 const { log, errInfo } = require('../utils/logger');
@@ -15,18 +15,18 @@ module.exports = {
 
     async execute(interaction) {
         if (!isOwnerId(interaction.user.id, interaction.guild)) {
-            return await interaction.reply({ content: '❌ Lệnh này chỉ dành riêng cho Owner!', flags: MessageFlags.Ephemeral });
+            return await interaction.reply({ content: '❌ Lệnh này chỉ dành riêng cho Owner!', allowedMentions: { parse: [] } });
         }
         const guild = interaction.guild;
-        if (!guild) return await interaction.reply({ content: '❌ Hãy dùng lệnh này trong server.', flags: MessageFlags.Ephemeral });
+        if (!guild) return await interaction.reply({ content: '❌ Hãy dùng lệnh này trong server.', allowedMentions: { parse: [] } });
 
         // Ảnh tĩnh PNG: avatar động của bot cần Nitro nên dùng ảnh tĩnh cho chắc
         const iconUrl = guild.iconURL({ extension: 'png', size: 1024, forceStatic: true });
         if (!iconUrl) {
-            return await interaction.reply({ content: '❌ Server này chưa có icon (avatar server), hãy đặt icon cho server trước.', flags: MessageFlags.Ephemeral });
+            return await interaction.reply({ content: '❌ Server này chưa có icon (avatar server), hãy đặt icon cho server trước.', allowedMentions: { parse: [] } });
         }
 
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferReply();
         const done = [];
         const problems = [];
         const bot = interaction.client.user;

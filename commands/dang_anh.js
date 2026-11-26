@@ -1,8 +1,7 @@
 const {
     SlashCommandBuilder,
     AttachmentBuilder,
-    EmbedBuilder,
-    MessageFlags
+    EmbedBuilder
 } = require('discord.js');
 const crypto = require('crypto');
 const db = require('../utils/db');
@@ -26,7 +25,7 @@ module.exports = {
         if (!checkStaffOrOwner(interaction.member)) {
             return interaction.reply({
                 content: '❌ Bạn không có quyền đăng bán tài khoản (Chỉ dành cho Staff hoặc Owner)!',
-                flags: MessageFlags.Ephemeral
+                allowedMentions: { parse: [] }
             });
         }
 
@@ -34,10 +33,10 @@ module.exports = {
         const price = (interaction.options.getString('price') || '').trim();
 
         if (!image || !String(image.contentType || '').startsWith('image/')) {
-            return interaction.reply({ content: '❌ File đính kèm phải là ảnh (png/jpg/webp)!', flags: MessageFlags.Ephemeral });
+            return interaction.reply({ content: '❌ File đính kèm phải là ảnh (png/jpg/webp)!', allowedMentions: { parse: [] } });
         }
         if (!price) {
-            return interaction.reply({ content: '❌ Thiếu giá bán!', flags: MessageFlags.Ephemeral });
+            return interaction.reply({ content: '❌ Thiếu giá bán!', allowedMentions: { parse: [] } });
         }
 
         await interaction.deferReply();
@@ -88,7 +87,7 @@ module.exports = {
 
             await interaction.followUp({
                 content: `ℹ️ Mã acc: \`${key}\`. Dùng \`/add_acc\` với mã này để nạp thông tin đăng nhập, nếu không khi khách mua bot sẽ không tự gửi DM được.`,
-                flags: MessageFlags.Ephemeral
+                allowedMentions: { parse: [] }
             }).catch(() => null);
         } catch (err) {
             console.error('[LỖI DANG_ANH]:', err);

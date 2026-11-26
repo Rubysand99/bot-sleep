@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ChannelType, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ChannelType } = require('discord.js');
 const { checkStaffOrOwner } = require('../utils/permissions');
 const { cfg } = require('../utils/runtime');
 
@@ -9,10 +9,10 @@ module.exports = {
 
     async execute(interaction) {
         if (!checkStaffOrOwner(interaction.member)) {
-            return await interaction.reply({ content: '❌ Lệnh này chỉ dành cho Staff hoặc Owner!', flags: MessageFlags.Ephemeral });
+            return await interaction.reply({ content: '❌ Lệnh này chỉ dành cho Staff hoặc Owner!', allowedMentions: { parse: [] } });
         }
-        // Phản hồi ẩn tạm thời để xử lý
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        // Phản hồi tạm trong lúc xử lý
+        await interaction.deferReply();
 
         const stockCategoryId = cfg('STOCK_ID', interaction.guild);
 

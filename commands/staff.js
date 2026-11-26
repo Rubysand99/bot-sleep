@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { isOwnerId } = require('../utils/permissions');
 const { cfg, getExtraStaff, getExtraOwners } = require('../utils/runtime');
 const { addStaffUser, removeStaffUser, setConfig } = require('../utils/config');
@@ -22,13 +22,13 @@ module.exports = {
 
     async execute(interaction) {
         if (!interaction.guildId) {
-            return await interaction.reply({ content: '❌ Staff được quản lý riêng từng server, hãy dùng lệnh này trong server cần cấu hình.', flags: MessageFlags.Ephemeral });
+            return await interaction.reply({ content: '❌ Staff được quản lý riêng từng server, hãy dùng lệnh này trong server cần cấu hình.', allowedMentions: { parse: [] } });
         }
         if (!isOwnerId(interaction.user.id, interaction.guild)) {
-            return await interaction.reply({ content: '❌ Lệnh này chỉ dành riêng cho Owner!', flags: MessageFlags.Ephemeral });
+            return await interaction.reply({ content: '❌ Lệnh này chỉ dành riêng cho Owner!', allowedMentions: { parse: [] } });
         }
         const sub = interaction.options.getSubcommand();
-        const reply = (content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
+        const reply = (content) => interaction.reply({ content, allowedMentions: { parse: [] } });
 
         if (sub === 'add') {
             const user = interaction.options.getUser('user');
@@ -68,6 +68,6 @@ module.exports = {
                 `**Staff thêm bằng /staff add ở server này (${users.length}):**\n` +
                 (users.length ? users.map(id => `• <@${id}>`).join('\n') : '*(trống)*'))
             .setFooter({ text: require('../utils/profile').current().name });
-        await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
     }
 };

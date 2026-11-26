@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ChannelType, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, ChannelType } = require('discord.js');
 const { checkStaffOrOwner } = require('../utils/permissions');
 const { createTextChannel } = require('../utils/channelManager');
 
@@ -19,14 +19,14 @@ module.exports = {
 
     async execute(interaction) {
         if (!checkStaffOrOwner(interaction.member)) {
-            return await interaction.reply({ content: '❌ Lệnh này chỉ dành cho Staff hoặc Owner!', flags: MessageFlags.Ephemeral });
+            return await interaction.reply({ content: '❌ Lệnh này chỉ dành cho Staff hoặc Owner!', allowedMentions: { parse: [] } });
         }
 
         const category = interaction.options.getChannel('danhmuc');
         const parentId = category?.id || interaction.channel?.parentId || null;
         const result = await createTextChannel(interaction.guild, interaction.options.getString('ten'), { parentId });
 
-        if (!result.ok) return await interaction.reply({ content: result.msg, flags: MessageFlags.Ephemeral });
-        await interaction.reply({ content: `✅ Đã tạo kênh <#${result.channel.id}> (\`${result.channel.id}\`).`, flags: MessageFlags.Ephemeral });
+        if (!result.ok) return await interaction.reply({ content: result.msg, allowedMentions: { parse: [] } });
+        await interaction.reply({ content: `✅ Đã tạo kênh <#${result.channel.id}> (\`${result.channel.id}\`).`, allowedMentions: { parse: [] } });
     }
 };

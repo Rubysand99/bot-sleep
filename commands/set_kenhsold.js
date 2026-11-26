@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ChannelType, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, ChannelType } = require('discord.js');
 const { isOwnerId } = require('../utils/permissions');
 const { setConfig } = require('../utils/config');
 
@@ -18,7 +18,7 @@ module.exports = {
         if (!isOwner) {
             return await interaction.reply({
                 content: '❌ Lệnh này chỉ dành riêng cho Owner Shop!',
-                flags: MessageFlags.Ephemeral
+                allowedMentions: { parse: [] }
             });
         }
 
@@ -29,7 +29,7 @@ module.exports = {
             content: `✅ **Đã cài đặt danh mục lưu trữ kênh đã bán thành công!**\n` +
                      `📁 **Danh mục:** **${category.name}** (\`${category.id}\`)\n` +
                      `*Chỉ áp dụng cho server này. Khi một tài khoản được bán (nhắn \`sold\` hoặc Confirm ticket), kênh đó sẽ tự động được chuyển vào danh mục này!*`,
-            flags: MessageFlags.Ephemeral
+            allowedMentions: { parse: [] }
         });
     }
 };

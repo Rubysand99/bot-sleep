@@ -1204,7 +1204,7 @@ async function handleInteraction(interaction) {
 }
 
 async function featureOff(interaction) {
-    const msg = { content: '❌ Tính năng này không có trong bot này.', flags: EPHEMERAL };
+    const msg = { content: '❌ Tính năng này không có trong bot này.', ...(interaction.isButton?.() || interaction.isStringSelectMenu?.() ? { flags: EPHEMERAL } : {}) };
     if (interaction.deferred || interaction.replied) return interaction.followUp(msg).catch(() => null);
     return interaction.reply(msg).catch(() => null);
 }
@@ -1217,13 +1217,13 @@ async function handleInteractionInner(interaction) {
             if (OWNER_ONLY_COMMANDS.includes(interaction.commandName) && !isOwnerId(interaction.user?.id, interaction.guild)) {
                 return await interaction.reply({
                     content: '❌ **Từ chối:** Lệnh này chỉ dành riêng cho Owner!',
-                    flags: EPHEMERAL
+                    allowedMentions: { parse: [] }
                 });
             }
             if (STAFF_RESTRICTED_COMMANDS.includes(interaction.commandName) && !checkStaffOrOwner(interaction.member)) {
                 return await interaction.reply({
                     content: '❌ **Từ chối:** Bạn không có quyền sử dụng lệnh này! (Yêu cầu vai trò Staff hoặc Owner)',
-                    flags: EPHEMERAL
+                    allowedMentions: { parse: [] }
                 });
             }
             const command = client.commands.get(interaction.commandName);
@@ -1240,14 +1240,14 @@ async function handleInteractionInner(interaction) {
             if (interaction.customId === 'modal_add_acc') {
                 if (!profile.has('autobuy')) return await featureOff(interaction);
                 if (!checkStaffOrOwner(interaction.member)) {
-                    return await interaction.reply({ content: '❌ Bạn không có quyền thêm tài khoản!', flags: EPHEMERAL });
+                    return await interaction.reply({ content: '❌ Bạn không có quyền thêm tài khoản!', allowedMentions: { parse: [] } });
                 }
 
                 const parsed = parseAccountForm(interaction.fields.getTextInputValue('account_data'));
                 if (!parsed) {
                     return await interaction.reply({
                         content: '❌ **Lỗi:** Không tìm thấy dòng `Username: <tên>` trong nội dung dán vào!',
-                        flags: EPHEMERAL
+                        allowedMentions: { parse: [] }
                     });
                 }
 
@@ -1261,7 +1261,7 @@ async function handleInteractionInner(interaction) {
                 if (!saved) {
                     return await interaction.reply({
                         content: '⏳ Tài khoản này đang có đơn giao dịch, không thể nạp lại thông tin lúc này!',
-                        flags: EPHEMERAL
+                        allowedMentions: { parse: [] }
                     });
                 }
 
@@ -1275,7 +1275,7 @@ async function handleInteractionInner(interaction) {
                                  : `⚠️ **Không đọc được thông tin đăng nhập nào** (Password, Email, Secret Key...). Bot sẽ không tự DM được khi bán!\n`) +
                              `🔒 **Trạng thái:** Sẵn sàng bán\n` +
                              `*Bây giờ bạn có thể dùng lệnh \`/stock acc username:${parsed.username} price:<giá>\` để đăng card bán!*`,
-                    flags: EPHEMERAL
+                    allowedMentions: { parse: [] }
                 });
                 return;
             }
@@ -1332,7 +1332,7 @@ async function handleInteractionInner(interaction) {
         console.error('[LỖI INTERACTION]:', error);
         // Luôn báo lại cho người dùng thay vì để họ thấy "ứng dụng không phản hồi"
         try {
-            const msg = { content: '❌ Đã xảy ra lỗi khi xử lý thao tác này. Vui lòng thử lại hoặc báo staff.', flags: EPHEMERAL };
+            const msg = { content: '❌ Đã xảy ra lỗi khi xử lý thao tác này. Vui lòng thử lại hoặc báo staff.', ...(interaction.isButton?.() || interaction.isStringSelectMenu?.() ? { flags: EPHEMERAL } : {}) };
             if (interaction.deferred || interaction.replied) await interaction.followUp(msg);
             else await interaction.reply(msg);
         } catch { /* không phản hồi được thì thôi */ }
